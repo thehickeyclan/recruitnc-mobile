@@ -17,6 +17,26 @@ export type RankingClass = {
   count: number
 }
 
+/**
+ * Mirrors lib/public-rankings-cap.ts in the web app. RecruitNC publishes a top 30, and only for
+ * the classes listed here — the DB's is_published flag is true for classes 2025 and 2026 too, so
+ * trusting it alone puts unpublished rankings on a public surface.
+ *
+ * Duplicated rather than fetched because neither web endpoint is usable anonymously: /api/rankings
+ * returns nothing (it reads a different source) and /api/public-rankings requires auth. If the cap
+ * or the published years change, this file has to change with them.
+ */
+const PUBLIC_RANKINGS_MAX_BY_YEAR: Record<number, number> = {
+  2027: 30,
+  2028: 30,
+}
+
+const PUBLISHED_YEARS = Object.keys(PUBLIC_RANKINGS_MAX_BY_YEAR).map(Number)
+
+function maxRankFor(year: number): number {
+  return PUBLIC_RANKINGS_MAX_BY_YEAR[year] ?? 30
+}
+
 const meaningful = (v: string | null) =>
   v && v.trim() && !/^(n\/a|tbd|none|no)$/i.test(v.trim()) ? v.trim() : null
 
@@ -35,7 +55,7 @@ export async function fetchRankingClasses(): Promise<RankingClass[]> {
   const byYear = new Map<number, RankingClass>()
   for (const row of data ?? []) {
     const year = row.graduation_year
-    if (!year) continue
+    if (!year || !PUBLISHED_YEARS.includes(year)) continue
     const existing = byYear.get(year)
     if (existing) {
       existing.count += 1
@@ -47,15 +67,21 @@ export async function fetchRankingClasses(): Promise<RankingClass[]> {
     }
   }
 
-  return [...byYear.values()].sort((a, b) => b.graduationYear - a.graduationYear)
+  return [...byYear.values()]
+    .map((c) => ({ ...c, count: Math.min(c.count, maxRankFor(c.graduationYear)) }))
+    .sort((a, b) => b.graduationYear - a.graduationYear)
 }
 
 export async function fetchRankings(graduationYear: number): Promise<RankedProspect[]> {
+  if (!PUBLISHED_YEARS.includes(graduationYear)) return []
+
   const { data, error } = await supabase
     .from("public_rankings")
     .select("id, name, high_school, state_result, academic_gpa, ranked_win, prospect_ranking, profile_image_url")
     .eq("is_published", true)
     .eq("graduation_year", graduationYear)
+    .lte("prospect_ranking", maxRankFor(graduationYear))
+    .gte("prospect_ranking", 1)
     .order("prospect_ranking", { ascending: true })
 
   if (error) throw new Error(error.message)
