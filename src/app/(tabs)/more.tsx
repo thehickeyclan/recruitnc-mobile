@@ -126,7 +126,14 @@ export default function MoreScreen() {
 
         <Text style={styles.sectionHeading}>RECRUITNC</Text>
         <View style={styles.group}>
-          <Pressable style={styles.row} onPress={() => void WebBrowser.openBrowserAsync(`${WEB}/athletes`)}>
+          <Pressable style={styles.row} onPress={() => void WebBrowser.openBrowserAsync(`${WEB}/news`)}>
+            <Text style={styles.linkTitle}>News</Text>
+            <Ionicons name="open-outline" size={16} color={colors.textMuted} />
+          </Pressable>
+          <Pressable
+            style={[styles.row, styles.rowDivider]}
+            onPress={() => void WebBrowser.openBrowserAsync(`${WEB}/athletes`)}
+          >
             <Text style={styles.linkTitle}>Open the full site</Text>
             <Ionicons name="open-outline" size={16} color={colors.textMuted} />
           </Pressable>

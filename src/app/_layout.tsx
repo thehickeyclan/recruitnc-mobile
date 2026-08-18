@@ -15,7 +15,10 @@ export default function RootLayout() {
           headerShown: false,
           contentStyle: { backgroundColor: colors.ink },
         }}
-      />
+      >
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="ask" options={{ presentation: "modal" }} />
+      </Stack>
     </>
   )
 }

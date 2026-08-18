@@ -1,9 +1,11 @@
-import { Tabs } from "expo-router"
+import { View, Pressable, Text, StyleSheet } from "react-native"
+import { Tabs, router } from "expo-router"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors } from "@/theme/tokens"
 
 export default function TabsLayout() {
   return (
+    <View style={styles.root}>
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -40,13 +42,6 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="news"
-        options={{
-          title: "News",
-          tabBarIcon: ({ color, size }) => <Ionicons name="newspaper" size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
         name="more"
         options={{
           title: "More",
@@ -54,5 +49,34 @@ export default function TabsLayout() {
         }}
       />
     </Tabs>
+
+      {/* Floating Data Dawg launcher — mirrors the website, and keeps the tab bar to five slots. */}
+      <Pressable style={styles.fab} onPress={() => router.push("/ask")} accessibilityLabel="Ask Data Dawg">
+        <Ionicons name="paw" size={18} color={colors.ink} />
+        <Text style={styles.fabText}>Data Dawg</Text>
+      </Pressable>
+    </View>
   )
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+  fab: {
+    position: "absolute",
+    right: 16,
+    bottom: 96,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 999,
+    backgroundColor: colors.gold,
+    shadowColor: "#000",
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
+  fabText: { fontSize: 13, fontWeight: "700", color: colors.ink },
+})
