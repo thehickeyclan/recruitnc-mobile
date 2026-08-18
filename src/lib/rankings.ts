@@ -1,0 +1,73 @@
+import { supabase } from "./supabase"
+
+export type RankedProspect = {
+  id: number
+  name: string
+  highSchool: string | null
+  stateResult: string | null
+  gpa: number | null
+  rankedWin: boolean
+  rank: number
+  photoUrl: string | null
+}
+
+export type RankingClass = {
+  graduationYear: number
+  publishedAt: string | null
+  count: number
+}
+
+const meaningful = (v: string | null) =>
+  v && v.trim() && !/^(n\/a|tbd|none|no)$/i.test(v.trim()) ? v.trim() : null
+
+/**
+ * Rankings are grouped by graduation class, not weight — weight_class reads "TBD" on all but one
+ * row, so it is never surfaced. Each class is published as its own edition.
+ */
+export async function fetchRankingClasses(): Promise<RankingClass[]> {
+  const { data, error } = await supabase
+    .from("public_rankings")
+    .select("graduation_year, published_at")
+    .eq("is_published", true)
+
+  if (error) throw new Error(error.message)
+
+  const byYear = new Map<number, RankingClass>()
+  for (const row of data ?? []) {
+    const year = row.graduation_year
+    if (!year) continue
+    const existing = byYear.get(year)
+    if (existing) {
+      existing.count += 1
+      if (row.published_at && (!existing.publishedAt || row.published_at > existing.publishedAt)) {
+        existing.publishedAt = row.published_at
+      }
+    } else {
+      byYear.set(year, { graduationYear: year, publishedAt: row.published_at ?? null, count: 1 })
+    }
+  }
+
+  return [...byYear.values()].sort((a, b) => b.graduationYear - a.graduationYear)
+}
+
+export async function fetchRankings(graduationYear: number): Promise<RankedProspect[]> {
+  const { data, error } = await supabase
+    .from("public_rankings")
+    .select("id, name, high_school, state_result, academic_gpa, ranked_win, prospect_ranking, profile_image_url")
+    .eq("is_published", true)
+    .eq("graduation_year", graduationYear)
+    .order("prospect_ranking", { ascending: true })
+
+  if (error) throw new Error(error.message)
+
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    name: r.name ?? "",
+    highSchool: meaningful(r.high_school),
+    stateResult: meaningful(r.state_result),
+    gpa: typeof r.academic_gpa === "number" ? r.academic_gpa : null,
+    rankedWin: /^yes$/i.test(r.ranked_win ?? ""),
+    rank: r.prospect_ranking ?? 0,
+    photoUrl: r.profile_image_url ?? null,
+  }))
+}
