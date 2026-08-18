@@ -45,6 +45,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "27d86797-0b08-4142-9095-e54eaff25916"
+      }
+    },
+    "owner": "nc-united"
   }
 }
