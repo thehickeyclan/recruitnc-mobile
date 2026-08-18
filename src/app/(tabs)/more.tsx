@@ -80,7 +80,7 @@ export default function MoreScreen() {
     <SafeAreaView style={styles.screen} edges={["top"]}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
-          <Text style={styles.eyebrow}>RECRUITNC</Text>
+          <Text style={styles.eyebrow}>NC UNITED</Text>
           <Text style={styles.title}>More</Text>
         </View>
 
@@ -124,7 +124,7 @@ export default function MoreScreen() {
 
         {notice ? <Text style={styles.notice}>{notice}</Text> : null}
 
-        <Text style={styles.sectionHeading}>RECRUITNC</Text>
+        <Text style={styles.sectionHeading}>NC UNITED</Text>
         <View style={styles.group}>
           <Pressable style={styles.row} onPress={() => void WebBrowser.openBrowserAsync(`${WEB}/news`)}>
             <Text style={styles.linkTitle}>News</Text>

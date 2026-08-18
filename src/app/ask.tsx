@@ -77,7 +77,7 @@ export default function AskScreen() {
       <View style={styles.header}>
         <View style={styles.headerRow}>
           <View style={styles.flexShrink}>
-            <Text style={styles.eyebrow}>RECRUITNC</Text>
+            <Text style={styles.eyebrow}>NC UNITED</Text>
             <Text style={styles.title}>Data Dawg</Text>
           </View>
           <Pressable onPress={() => router.back()} hitSlop={12} accessibilityLabel="Close">

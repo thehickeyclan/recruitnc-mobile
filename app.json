@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "RecruitNC",
+    "name": "NC United",
     "slug": "recruitnc",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -10,13 +10,13 @@
     "backgroundColor": "#0A1628",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.recruitnc.app",
+      "bundleIdentifier": "com.ncunited.app",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "package": "com.recruitnc.app",
+      "package": "com.ncunited.app",
       "adaptiveIcon": {
         "backgroundColor": "#0A1628",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

@@ -1,5 +1,9 @@
 /**
- * RecruitNC design tokens — mirrors the `rnc.*` palette in the web app's tailwind.config.ts.
+ * NC United design tokens — mirrors the `rnc.*` palette in the web app's tailwind.config.ts,
+ * which that file documents as "the dark navy actually shipped on the public pages".
+ *
+ * Navy and gold only. The brand's red (#BC0B03) is kept for destructive states, never as an
+ * accent, so the app reads as two colours rather than three.
  *
  * The web codebase carries three near-miss navies and two golds (the legacy `nc-*` tokens).
  * The app deliberately ships only this set so that drift can't start here. If a colour is

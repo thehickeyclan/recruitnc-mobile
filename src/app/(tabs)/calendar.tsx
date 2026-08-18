@@ -101,7 +101,7 @@ export default function CalendarScreen() {
   return (
     <SafeAreaView style={styles.screen} edges={["top"]}>
       <View style={styles.header}>
-        <Text style={styles.eyebrow}>RECRUITNC</Text>
+        <Text style={styles.eyebrow}>NC UNITED</Text>
         <Text style={styles.headerTitle}>Calendar</Text>
         {!loading && !error ? (
           <Text style={styles.subtitle}>

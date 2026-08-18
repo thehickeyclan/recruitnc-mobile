@@ -15,7 +15,7 @@ export function PlaceholderScreen({
   return (
     <SafeAreaView style={styles.screen} edges={["top"]}>
       <View style={styles.header}>
-        <Text style={styles.eyebrow}>RECRUITNC</Text>
+        <Text style={styles.eyebrow}>NC UNITED</Text>
         <Text style={styles.title}>{title}</Text>
       </View>
       <View style={styles.center}>
