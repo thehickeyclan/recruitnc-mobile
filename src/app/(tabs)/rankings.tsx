@@ -10,7 +10,10 @@ import {
   View,
 } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
+import { router } from "expo-router"
+import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors, radius, space, type } from "@/theme/tokens"
+import { useSession } from "@/lib/auth"
 import {
   fetchRankingClasses,
   fetchRankings,
@@ -60,6 +63,7 @@ function RankRow({ prospect }: { prospect: RankedProspect }) {
 }
 
 export default function RankingsScreen() {
+  const { signedIn, loading: sessionLoading } = useSession()
   const [classes, setClasses] = useState<RankingClass[]>([])
   const [activeYear, setActiveYear] = useState<number | null>(null)
   const [prospects, setProspects] = useState<RankedProspect[]>([])
@@ -105,6 +109,36 @@ export default function RankingsScreen() {
     await load(activeYear)
     setRefreshing(false)
   }, [activeYear, load])
+
+  if (!sessionLoading && !signedIn) {
+    return (
+      <SafeAreaView style={styles.screen} edges={["top"]}>
+        <View style={styles.header}>
+          <Text style={styles.eyebrow}>RECRUITNC</Text>
+          <Text style={styles.title} maxFontSizeMultiplier={1.4}>Rankings</Text>
+        </View>
+        <View style={styles.gate}>
+          <Ionicons name="lock-closed" size={34} color={colors.line} />
+          <Text style={styles.gateTitle}>Sign in for RecruitNC rankings</Text>
+          <Text style={styles.gateBody}>
+            Rankings are an account feature so we can protect the work and personalise your view.
+            Commitments, the calendar and Data Dawg stay open to everyone.
+          </Text>
+          <Pressable
+            style={styles.gateButton}
+            onPress={() =>
+              router.push({
+                pathname: "/sign-in",
+                params: { reason: "Sign in to see RecruitNC prospect rankings." },
+              })
+            }
+          >
+            <Text style={styles.gateButtonText}>Sign in or create an account</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    )
+  }
 
   return (
     <SafeAreaView style={styles.screen} edges={["top"]}>
@@ -183,6 +217,17 @@ const styles = StyleSheet.create({
   chipCount: { ...type.caption, color: colors.textMuted },
   chipCountActive: { color: colors.ink },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  gate: { flex: 1, alignItems: "center", justifyContent: "center", gap: space.md, paddingHorizontal: space.xl, paddingBottom: 80 },
+  gateTitle: { ...type.title, color: colors.text, textAlign: "center" },
+  gateBody: { ...type.body, color: colors.textSecondary, textAlign: "center", lineHeight: 21 },
+  gateButton: {
+    backgroundColor: colors.gold,
+    borderRadius: radius.md,
+    paddingVertical: space.lg,
+    paddingHorizontal: space.xl,
+    marginTop: space.sm,
+  },
+  gateButtonText: { ...type.heading, color: colors.ink },
   error: { ...type.body, color: colors.textSecondary, paddingHorizontal: space.xl, textAlign: "center" },
   list: { paddingHorizontal: space.lg, paddingBottom: space.xxl, gap: space.sm },
   row: {

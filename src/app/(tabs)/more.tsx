@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from "react"
-import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native"
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import * as WebBrowser from "expo-web-browser"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors, radius, space, type } from "@/theme/tokens"
+import { router } from "expo-router"
 import { DEFAULT_PREFS, PushUnavailableError, registerForPush, syncDevice, type AlertPrefs } from "@/lib/push"
+import { deleteAccount, signOut, useSession } from "@/lib/auth"
 
 const PREFS_KEY = "recruitnc.alertPrefs"
 const WEB = process.env.EXPO_PUBLIC_WEB_BASE_URL
@@ -17,6 +19,7 @@ const ALERTS: { key: keyof AlertPrefs; title: string; detail: string }[] = [
 ]
 
 export default function MoreScreen() {
+  const { session, signedIn } = useSession()
   const [prefs, setPrefs] = useState<AlertPrefs>(DEFAULT_PREFS)
   const [enabled, setEnabled] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -76,6 +79,27 @@ export default function MoreScreen() {
     [prefs, enabled, persist],
   )
 
+  function confirmDelete() {
+    // Apple requires deletion to be reachable in the app; the confirmation is ours, because it
+    // is irreversible and one careless tap should not end an account.
+    Alert.alert(
+      "Delete account?",
+      "This permanently deletes your NC United account. Commitments and rankings stay published — they are sports records, not account data. This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            void deleteAccount()
+              .then(() => setNotice("Your account has been deleted."))
+              .catch((e) => setNotice(e instanceof Error ? e.message : "Could not delete your account."))
+          },
+        },
+      ],
+    )
+  }
+
   return (
     <SafeAreaView style={styles.screen} edges={["top"]}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -83,6 +107,31 @@ export default function MoreScreen() {
           <Text style={styles.eyebrow}>NC UNITED</Text>
           <Text style={styles.title} maxFontSizeMultiplier={1.4}>More</Text>
         </View>
+
+        <Text style={styles.sectionHeading}>ACCOUNT</Text>
+        {signedIn ? (
+          <View style={styles.group}>
+            <View style={styles.row}>
+              <View style={styles.rowBody}>
+                <Text style={styles.rowTitle}>Signed in</Text>
+                <Text style={styles.rowDetail}>{session?.user?.email ?? ""}</Text>
+              </View>
+            </View>
+            <Pressable style={[styles.row, styles.rowDivider]} onPress={() => void signOut()}>
+              <Text style={styles.linkTitle}>Sign out</Text>
+              <Ionicons name="log-out-outline" size={16} color={colors.textMuted} />
+            </Pressable>
+            <Pressable style={[styles.row, styles.rowDivider]} onPress={confirmDelete}>
+              <Text style={[styles.linkTitle, styles.destructive]}>Delete account</Text>
+              <Ionicons name="trash-outline" size={16} color={colors.red} />
+            </Pressable>
+          </View>
+        ) : (
+          <Pressable style={styles.enableCard} onPress={() => router.push("/sign-in")}>
+            <Ionicons name="person-circle" size={17} color={colors.ink} />
+            <Text style={styles.enableText}>Sign in or create an account</Text>
+          </Pressable>
+        )}
 
         <Text style={styles.sectionHeading}>ALERTS</Text>
 
@@ -198,5 +247,6 @@ const styles = StyleSheet.create({
   rowTitle: { ...type.body, color: colors.text, fontWeight: "600" },
   rowDetail: { ...type.label, color: colors.textMuted, fontWeight: "500" },
   linkTitle: { ...type.body, color: colors.text, fontWeight: "600" },
+  destructive: { color: colors.red },
   notice: { ...type.label, color: colors.textSecondary, fontWeight: "500", marginTop: space.md, lineHeight: 18 },
 })

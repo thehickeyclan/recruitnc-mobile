@@ -18,6 +18,7 @@ export default function RootLayout() {
       >
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="ask" options={{ presentation: "modal" }} />
+        <Stack.Screen name="sign-in" options={{ presentation: "modal" }} />
       </Stack>
     </>
   )
