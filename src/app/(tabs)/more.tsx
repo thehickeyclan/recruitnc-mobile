@@ -81,7 +81,7 @@ export default function MoreScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <Text style={styles.eyebrow}>NC UNITED</Text>
-          <Text style={styles.title}>More</Text>
+          <Text style={styles.title} maxFontSizeMultiplier={1.4}>More</Text>
         </View>
 
         <Text style={styles.sectionHeading}>ALERTS</Text>

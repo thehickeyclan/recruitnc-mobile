@@ -110,7 +110,7 @@ export default function RankingsScreen() {
     <SafeAreaView style={styles.screen} edges={["top"]}>
       <View style={styles.header}>
         <Text style={styles.eyebrow}>RECRUITNC</Text>
-        <Text style={styles.title}>Rankings</Text>
+        <Text style={styles.title} maxFontSizeMultiplier={1.4}>Rankings</Text>
       </View>
 
       <ScrollView
@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: space.md },
   eyebrow: { ...type.caption, color: colors.gold, marginBottom: space.xs },
   title: { ...type.display, color: colors.text },
-  chipStrip: { flexGrow: 0, height: 46, marginBottom: space.md },
+  chipStrip: { flexGrow: 0, minHeight: 46, marginBottom: space.md },
   chips: { paddingHorizontal: space.lg, gap: space.sm, alignItems: "center" },
   chip: {
     flexDirection: "row",

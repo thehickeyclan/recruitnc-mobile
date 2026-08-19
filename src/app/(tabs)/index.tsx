@@ -56,12 +56,9 @@ function CommitCard({ commit }: { commit: Commit }) {
       )}
 
       <View style={styles.cardBody}>
-        <View style={styles.nameRow}>
-          <Text style={styles.name} numberOfLines={1}>
-            {commit.name}
-          </Text>
-          {date ? <Text style={styles.date}>{date}</Text> : null}
-        </View>
+        <Text style={styles.name} numberOfLines={2}>
+          {commit.name}
+        </Text>
 
         <View style={styles.collegeRow}>
           {showLogo ? (
@@ -78,8 +75,13 @@ function CommitCard({ commit }: { commit: Commit }) {
           </Text>
         </View>
 
-        <Text style={styles.meta} numberOfLines={1}>
-          {[commit.highschool, commit.weightclass ? `${commit.weightclass} lbs` : null, commit.graduationyear ? `'${String(commit.graduationyear).slice(2)}` : null]
+        <Text style={styles.meta}>
+          {[
+            commit.highschool,
+            commit.weightclass ? `${commit.weightclass} lbs` : null,
+            commit.graduationyear ? `'${String(commit.graduationyear).slice(2)}` : null,
+            date,
+          ]
             .filter(Boolean)
             .join("  ·  ")}
         </Text>
@@ -139,7 +141,7 @@ export default function CommitsScreen() {
     <SafeAreaView style={styles.screen} edges={["top"]}>
       <View style={styles.header}>
         <Text style={styles.eyebrow}>RECRUITNC</Text>
-        <Text style={styles.title}>Commitments</Text>
+        <Text style={styles.title} maxFontSizeMultiplier={1.4}>Commitments</Text>
         {!loading && !error ? (
           <Text style={styles.subtitle}>
             {activeYear === "all"
@@ -186,7 +188,7 @@ const styles = StyleSheet.create({
   list: { paddingHorizontal: space.lg, paddingBottom: space.xxl, gap: space.md },
   card: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     backgroundColor: colors.raised,
     borderRadius: radius.lg,
     borderWidth: 1,
@@ -194,15 +196,13 @@ const styles = StyleSheet.create({
     padding: space.md,
     gap: space.md,
   },
-  avatar: { width: 56, height: 56, borderRadius: radius.md, backgroundColor: colors.surface },
+  avatar: { width: 56, height: 56, borderRadius: radius.md, backgroundColor: colors.surface, alignSelf: "flex-start" },
   avatarFallback: { alignItems: "center", justifyContent: "center" },
   avatarInitials: { ...type.heading, color: colors.gold },
   cardBody: { flex: 1, gap: 3 },
-  nameRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: space.sm },
-  name: { ...type.heading, color: colors.text, flexShrink: 1 },
+  name: { ...type.heading, color: colors.text },
   collegeRow: { flexDirection: "row", alignItems: "center", gap: space.sm },
   collegeLogo: { width: 18, height: 18 },
   college: { ...type.label, color: colors.gold, flexShrink: 1 },
   meta: { ...type.label, color: colors.textMuted, fontWeight: "500" },
-  date: { ...type.caption, color: colors.textMuted, flexShrink: 0 },
 })

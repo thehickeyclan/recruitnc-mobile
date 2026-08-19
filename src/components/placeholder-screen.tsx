@@ -16,7 +16,7 @@ export function PlaceholderScreen({
     <SafeAreaView style={styles.screen} edges={["top"]}>
       <View style={styles.header}>
         <Text style={styles.eyebrow}>NC UNITED</Text>
-        <Text style={styles.title}>{title}</Text>
+        <Text style={styles.title} maxFontSizeMultiplier={1.4}>{title}</Text>
       </View>
       <View style={styles.center}>
         <Ionicons name={icon} size={40} color={colors.line} />

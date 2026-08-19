@@ -41,7 +41,7 @@ export function FilterChips({
 }
 
 const styles = StyleSheet.create({
-  strip: { flexGrow: 0, height: 46, marginBottom: space.md },
+  strip: { flexGrow: 0, minHeight: 46, marginBottom: space.md },
   content: { paddingHorizontal: space.lg, gap: space.sm, alignItems: "center" },
   chip: {
     flexDirection: "row",
