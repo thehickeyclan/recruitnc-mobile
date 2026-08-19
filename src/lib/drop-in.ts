@@ -4,7 +4,6 @@ export type DropInPayload = {
   eventId: string
   wrestlerName: string
   wrestlerDob: string
-  wrestlerCell: string
   wrestlerWeight?: string
   parentName: string
   parentEmail: string
@@ -49,4 +48,3 @@ export function ageFromDob(input: string): number | null {
   return age
 }
 
-export const digitsOnly = (s: string) => s.replace(/\D/g, "")

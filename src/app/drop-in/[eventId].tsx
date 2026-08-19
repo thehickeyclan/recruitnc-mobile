@@ -15,7 +15,7 @@ import { router, useLocalSearchParams } from "expo-router"
 import * as WebBrowser from "expo-web-browser"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors, radius, space, type } from "@/theme/tokens"
-import { ageFromDob, createDropInCheckout, digitsOnly } from "@/lib/drop-in"
+import { ageFromDob, createDropInCheckout } from "@/lib/drop-in"
 
 function Field({
   label,
@@ -59,7 +59,6 @@ export default function DropInScreen() {
 
   const [wrestlerName, setWrestlerName] = useState("")
   const [wrestlerDob, setWrestlerDob] = useState("")
-  const [wrestlerCell, setWrestlerCell] = useState("")
   const [wrestlerWeight, setWrestlerWeight] = useState("")
   const [parentName, setParentName] = useState("")
   const [parentEmail, setParentEmail] = useState("")
@@ -81,7 +80,6 @@ export default function DropInScreen() {
     const age = ageFromDob(wrestlerDob)
     if (age == null) return "Enter the wrestler's date of birth as MM/DD/YYYY."
     if (age < 5 || age > 18) return "Wrestler must be between 5 and 18 years old for drop-in practices."
-    if (digitsOnly(wrestlerCell).length !== 10) return "Enter a valid 10-digit wrestler cell number."
     if (!parentName.trim()) return "Enter the parent or guardian's name."
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(parentEmail.trim())) return "Enter a valid parent email address."
     if (!waiverAccepted) return "You must accept the Waiver and Release of Liability before continuing."
@@ -101,7 +99,6 @@ export default function DropInScreen() {
         eventId: String(eventId),
         wrestlerName: wrestlerName.trim(),
         wrestlerDob: wrestlerDob.trim(),
-        wrestlerCell: wrestlerCell.trim(),
         wrestlerWeight: wrestlerWeight.trim() || undefined,
         parentName: parentName.trim(),
         parentEmail: parentEmail.trim(),
@@ -146,13 +143,6 @@ export default function DropInScreen() {
             onChangeText={setWrestlerDob}
             placeholder="MM/DD/YYYY"
             keyboardType="number-pad"
-          />
-          <Field
-            label="Cell number"
-            value={wrestlerCell}
-            onChangeText={setWrestlerCell}
-            placeholder="(919) 555-0134"
-            keyboardType="phone-pad"
           />
           <Field
             label="Weight"
