@@ -28,13 +28,17 @@ export function MonthGrid({
   const today = new Date()
   const todayIso = iso(today.getFullYear(), today.getMonth(), today.getDate())
 
-  const cells = useMemo(() => {
+  /** Grouped into week rows rather than one wrapping list: a percentage cell width rounds up and
+   *  wraps at six per row, which silently shifts every date onto the wrong weekday. */
+  const weeks = useMemo(() => {
     const firstWeekday = new Date(year, month, 1).getDay()
     const daysInMonth = new Date(year, month + 1, 0).getDate()
-    const out: (string | null)[] = Array(firstWeekday).fill(null)
-    for (let d = 1; d <= daysInMonth; d += 1) out.push(iso(year, month, d))
-    while (out.length % 7 !== 0) out.push(null)
-    return out
+    const cells: (string | null)[] = Array(firstWeekday).fill(null)
+    for (let d = 1; d <= daysInMonth; d += 1) cells.push(iso(year, month, d))
+    while (cells.length % 7 !== 0) cells.push(null)
+    const rows: (string | null)[][] = []
+    for (let i = 0; i < cells.length; i += 7) rows.push(cells.slice(i, i + 7))
+    return rows
   }, [year, month])
 
   // One pass over events per cell would be O(cells × events); events are few, so this stays cheap.
@@ -68,8 +72,9 @@ export function MonthGrid({
         ))}
       </View>
 
-      <View style={styles.grid}>
-        {cells.map((day, i) => {
+      {weeks.map((week, w) => (
+      <View key={w} style={styles.week}>
+        {week.map((day, i) => {
           if (!day) return <View key={i} style={styles.cell} />
           const accents = accentsFor(day)
           const isToday = day === todayIso
@@ -101,6 +106,7 @@ export function MonthGrid({
           )
         })}
       </View>
+      ))}
     </View>
   )
 }
@@ -116,8 +122,8 @@ const styles = StyleSheet.create({
   monthLabel: { ...type.heading, color: colors.text },
   weekRow: { flexDirection: "row", marginTop: space.xs },
   weekday: { ...type.caption, color: colors.textMuted, flex: 1, textAlign: "center" },
-  grid: { flexDirection: "row", flexWrap: "wrap", marginTop: space.xs },
-  cell: { width: `${100 / 7}%`, alignItems: "center", paddingVertical: 5 },
+  week: { flexDirection: "row", marginTop: space.xs },
+  cell: { flex: 1, alignItems: "center", paddingVertical: 5 },
   dayBubble: {
     width: 32,
     height: 32,
