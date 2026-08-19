@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { Image } from "expo-image"
 import { colors, radius, space, type } from "@/theme/tokens"
 import { fetchCommits, type Commit } from "@/lib/commits"
+import { FilterChips, type Chip } from "@/components/filter-chips"
 
 function initials(name: string) {
   return name
@@ -81,6 +82,7 @@ function CommitCard({ commit }: { commit: Commit }) {
 export default function CommitsScreen() {
   const [commits, setCommits] = useState<Commit[]>([])
   const [total, setTotal] = useState(0)
+  const [activeYear, setActiveYear] = useState("all")
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -100,6 +102,23 @@ export default function CommitsScreen() {
     void load().finally(() => setLoading(false))
   }, [load])
 
+  const chips = useMemo<Chip[]>(() => {
+    const counts = new Map<number, number>()
+    for (const c of commits) {
+      if (c.graduationyear) counts.set(c.graduationyear, (counts.get(c.graduationyear) ?? 0) + 1)
+    }
+    const years = [...counts.entries()].sort((a, b) => b[0] - a[0])
+    return [
+      { key: "all", label: "All", count: commits.length },
+      ...years.map(([year, count]) => ({ key: String(year), label: `Class of ${year}`, count })),
+    ]
+  }, [commits])
+
+  const visible = useMemo(
+    () => (activeYear === "all" ? commits : commits.filter((c) => String(c.graduationyear) === activeYear)),
+    [commits, activeYear],
+  )
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
     await load()
@@ -112,7 +131,11 @@ export default function CommitsScreen() {
         <Text style={styles.eyebrow}>RECRUITNC</Text>
         <Text style={styles.title}>Commitments</Text>
         {!loading && !error ? (
-          <Text style={styles.subtitle}>{total} North Carolina wrestlers committed</Text>
+          <Text style={styles.subtitle}>
+            {activeYear === "all"
+              ? `${total} North Carolina wrestlers committed`
+              : `${visible.length} committed in the class of ${activeYear}`}
+          </Text>
         ) : null}
       </View>
 
@@ -125,8 +148,10 @@ export default function CommitsScreen() {
           <Text style={styles.error}>{error}</Text>
         </View>
       ) : (
+        <>
+        <FilterChips chips={chips} activeKey={activeYear} onChange={setActiveYear} />
         <FlatList
-          data={commits}
+          data={visible}
           keyExtractor={(c) => c.id}
           renderItem={({ item }) => <CommitCard commit={item} />}
           contentContainerStyle={styles.list}
@@ -134,6 +159,7 @@ export default function CommitsScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.gold} />
           }
         />
+        </>
       )}
     </SafeAreaView>
   )

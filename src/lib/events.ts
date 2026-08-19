@@ -48,6 +48,41 @@ export function formatTime(time: string | null): string | null {
   return `${hour % 12 || 12}:${m} ${ampm}`
 }
 
+function mapRow(e: Record<string, any>): CalendarEvent {
+  const meta = CATEGORY[e.category] ?? { label: e.category ?? "Event", accent: colors.textMuted }
+  return {
+    id: e.id,
+    title: e.title ?? "Untitled event",
+    category: e.category ?? "",
+    categoryLabel: meta.label,
+    accent: meta.accent,
+    startDate: e.start_date,
+    endDate: e.end_date ?? null,
+    startTime: e.start_time ?? null,
+    endTime: e.end_time ?? null,
+    location: e.location?.replace(/\s*·\s*$/, "").trim() || null,
+    externalLink: e.external_link ?? null,
+    acceptsDropIn: acceptsDropIn(e.category ?? "", e.max_drop_ins ?? null),
+  }
+}
+
+/** Every event, not just upcoming — the month grid has to render past months too. */
+export async function fetchAllEvents(): Promise<CalendarEvent[]> {
+  const { data, error } = await supabase
+    .from("events")
+    .select("id, title, category, start_date, end_date, start_time, end_time, location, external_link, max_drop_ins")
+    .order("start_date", { ascending: true })
+
+  if (error) throw new Error(error.message)
+  return (data ?? []).filter((e) => e.start_date).map(mapRow)
+}
+
+/** True when the event covers this YYYY-MM-DD, spanning multi-day events across their range. */
+export function eventCoversDate(event: CalendarEvent, iso: string): boolean {
+  const end = event.endDate && event.endDate >= event.startDate ? event.endDate : event.startDate
+  return iso >= event.startDate && iso <= end
+}
+
 export async function fetchUpcomingEvents(): Promise<CalendarEvent[]> {
   const { data, error } = await supabase
     .from("events")
