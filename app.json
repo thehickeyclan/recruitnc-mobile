@@ -52,6 +52,13 @@
         "projectId": "27d86797-0b08-4142-9095-e54eaff25916"
       }
     },
-    "owner": "nc-united"
+    "owner": "nc-united",
+    "updates": {
+      "url": "https://u.expo.dev/27d86797-0b08-4142-9095-e54eaff25916",
+      "fallbackToCacheTimeout": 0
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    }
   }
 }
