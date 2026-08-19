@@ -1,6 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from "react-native"
+import {
+  ActivityIndicator,
+  FlatList,
+  Keyboard,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
+import Ionicons from "@expo/vector-icons/Ionicons"
 import { Image } from "expo-image"
 import { colors, radius, space, type } from "@/theme/tokens"
 import { fetchCommits, type Commit } from "@/lib/commits"
@@ -95,6 +106,8 @@ export default function CommitsScreen() {
   const [commits, setCommits] = useState<Commit[]>([])
   const [total, setTotal] = useState(0)
   const [activeYear, setActiveYear] = useState("all")
+  const [query, setQuery] = useState("")
+  const [activeDivision, setActiveDivision] = useState("all")
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -126,10 +139,31 @@ export default function CommitsScreen() {
     ]
   }, [commits])
 
-  const visible = useMemo(
-    () => (activeYear === "all" ? commits : commits.filter((c) => String(c.graduationyear) === activeYear)),
-    [commits, activeYear],
-  )
+  const divisionChips = useMemo<Chip[]>(() => {
+    const ORDER = ["DI", "DII", "DIII", "NAIA", "NJCAA", "Club", "Other"]
+    const counts = new Map<string, number>()
+    for (const c of commits) {
+      if (c.division) counts.set(c.division, (counts.get(c.division) ?? 0) + 1)
+    }
+    const present = [...counts.entries()].sort(
+      (a, b) => ORDER.indexOf(a[0]) - ORDER.indexOf(b[0]),
+    )
+    return [
+      { key: "all", label: "All levels" },
+      ...present.map(([division, count]) => ({ key: division, label: division, count })),
+    ]
+  }, [commits])
+
+  const visible = useMemo(() => {
+    let list =
+      activeYear === "all" ? commits : commits.filter((c) => String(c.graduationyear) === activeYear)
+    if (activeDivision !== "all") list = list.filter((c) => c.division === activeDivision)
+    const q = query.trim().toLowerCase()
+    if (!q) return list
+    return list.filter((c) =>
+      [c.name, c.college, c.highschool].some((field) => field?.toLowerCase().includes(q)),
+    )
+  }, [commits, activeYear, activeDivision, query])
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
@@ -144,9 +178,9 @@ export default function CommitsScreen() {
         <Text style={styles.title} maxFontSizeMultiplier={1.4}>Commitments</Text>
         {!loading && !error ? (
           <Text style={styles.subtitle}>
-            {activeYear === "all"
+            {activeYear === "all" && activeDivision === "all" && !query.trim()
               ? `${total} North Carolina wrestlers committed`
-              : `${visible.length} committed in the class of ${activeYear}`}
+              : `${visible.length} of ${total} commitments`}
           </Text>
         ) : null}
       </View>
@@ -161,12 +195,36 @@ export default function CommitsScreen() {
         </View>
       ) : (
         <>
+        <View style={styles.searchWrap}>
+          <Ionicons name="search" size={16} color={colors.textMuted} />
+          <TextInput
+            style={styles.search}
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search name, college or school"
+            placeholderTextColor={colors.textMuted}
+            autoCorrect={false}
+            autoCapitalize="none"
+            returnKeyType="search"
+            onSubmitEditing={() => Keyboard.dismiss()}
+          />
+          {query ? (
+            <Pressable onPress={() => setQuery("")} hitSlop={10} accessibilityLabel="Clear search">
+              <Ionicons name="close-circle" size={17} color={colors.textMuted} />
+            </Pressable>
+          ) : null}
+        </View>
         <FilterChips chips={chips} activeKey={activeYear} onChange={setActiveYear} />
+        <FilterChips chips={divisionChips} activeKey={activeDivision} onChange={setActiveDivision} />
         <FlatList
           data={visible}
           keyExtractor={(c) => c.id}
           renderItem={({ item }) => <CommitCard commit={item} />}
           contentContainerStyle={styles.list}
+          keyboardDismissMode="on-drag"
+          ListEmptyComponent={
+            <Text style={styles.empty}>No commitments match “{query}”</Text>
+          }
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.gold} />
           }
@@ -186,6 +244,21 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   error: { ...type.body, color: colors.textSecondary, paddingHorizontal: space.xl, textAlign: "center" },
   list: { paddingHorizontal: space.lg, paddingBottom: space.xxl, gap: space.md },
+  searchWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.sm,
+    marginHorizontal: space.lg,
+    marginBottom: space.md,
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radius.md,
+  },
+  search: { flex: 1, color: colors.text, fontSize: 15, paddingVertical: 4 },
+  empty: { ...type.body, color: colors.textMuted, textAlign: "center", paddingVertical: space.xl },
   card: {
     flexDirection: "row",
     alignItems: "flex-start",

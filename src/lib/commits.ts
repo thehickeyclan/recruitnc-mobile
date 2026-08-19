@@ -1,5 +1,17 @@
 import { supabase } from "./supabase"
 
+/** Short labels — "NCAA Division I" is far too wide for a filter chip. */
+const DIVISION_LABEL: Record<string, string> = {
+  "NCAA Division I": "DI",
+  "NCAA Division II": "DII",
+  "NCAA Division III": "DIII",
+  "NCAA Division I (FCS Football)": "DI",
+  NAIA: "NAIA",
+  NJCAA: "NJCAA",
+  Club: "Club",
+  Other: "Other",
+}
+
 export type Commit = {
   id: string
   name: string
@@ -10,6 +22,7 @@ export type Commit = {
   photourl: string | null
   commitmentdate: string | null
   collegeLogoUrl: string | null
+  division: string | null
 }
 
 /** "University of North Carolina at Pembroke" → "north carolina pembroke" */
@@ -55,11 +68,23 @@ async function fetchCollegeLogos(colleges: string[]): Promise<Record<string, str
   return out
 }
 
+/** Division lives on the college, not the athlete, so it is resolved through college_id. */
+async function fetchDivisions(collegeIds: string[]): Promise<Record<string, string>> {
+  if (collegeIds.length === 0) return {}
+  const { data, error } = await supabase.from("colleges").select("id, division").in("id", collegeIds)
+  if (error || !data) return {}
+  const out: Record<string, string> = {}
+  for (const row of data) {
+    if (row.id && row.division) out[row.id] = DIVISION_LABEL[row.division] ?? row.division
+  }
+  return out
+}
+
 export async function fetchCommits(limit = 300): Promise<{ commits: Commit[]; total: number }> {
   const { data, error, count } = await supabase
     .from("athletes")
     .select(
-      "id, name, college, highschool, weightclass, graduationyear, photourl, commitmentdate",
+      "id, name, college, college_id, highschool, weightclass, graduationyear, photourl, commitmentdate",
       { count: "exact" },
     )
     .not("college", "is", null)
@@ -70,7 +95,10 @@ export async function fetchCommits(limit = 300): Promise<{ commits: Commit[]; to
   if (error) throw new Error(error.message)
   const rows = data ?? []
 
-  const logos = await fetchCollegeLogos([...new Set(rows.map((r) => r.college).filter(Boolean))])
+  const [logos, divisions] = await Promise.all([
+    fetchCollegeLogos([...new Set(rows.map((r) => r.college).filter(Boolean))]),
+    fetchDivisions([...new Set(rows.map((r) => r.college_id).filter(Boolean))] as string[]),
+  ])
 
   return {
     total: count ?? rows.length,
@@ -84,6 +112,7 @@ export async function fetchCommits(limit = 300): Promise<{ commits: Commit[]; to
       photourl: r.photourl ?? null,
       commitmentdate: r.commitmentdate ?? null,
       collegeLogoUrl: logos[r.college] ?? null,
+      division: r.college_id ? divisions[r.college_id] ?? null : null,
     })),
   }
 }
