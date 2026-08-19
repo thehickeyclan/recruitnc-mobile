@@ -128,7 +128,7 @@ export default function RankingsScreen() {
               style={[styles.chip, active && styles.chipActive]}
             >
               <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                Class of {c.graduationYear}
+                {c.graduationYear}
               </Text>
               <Text style={[styles.chipCount, active && styles.chipCountActive]}>{c.count}</Text>
             </Pressable>

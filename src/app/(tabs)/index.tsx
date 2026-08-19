@@ -15,11 +15,21 @@ function initials(name: string) {
     .join("")
 }
 
+/**
+ * The date shares a row with the athlete's name, so it stays as short as the information allows:
+ * the year only appears when it is not the current one. A full "Aug 18, 2026" squeezed names into
+ * ellipsis on narrower phones, and the name is the most important text on the card.
+ */
 function formatDate(iso: string | null) {
   if (!iso) return null
   const d = new Date(iso + "T00:00:00")
   if (Number.isNaN(d.getTime())) return null
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+  const sameYear = d.getFullYear() === new Date().getFullYear()
+  return d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    ...(sameYear ? {} : { year: "numeric" }),
+  })
 }
 
 function CommitCard({ commit }: { commit: Commit }) {
@@ -110,7 +120,7 @@ export default function CommitsScreen() {
     const years = [...counts.entries()].sort((a, b) => b[0] - a[0])
     return [
       { key: "all", label: "All", count: commits.length },
-      ...years.map(([year, count]) => ({ key: String(year), label: `Class of ${year}`, count })),
+      ...years.map(([year, count]) => ({ key: String(year), label: String(year), count })),
     ]
   }, [commits])
 
