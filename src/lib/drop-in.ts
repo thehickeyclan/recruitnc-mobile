@@ -3,7 +3,7 @@ const BASE = process.env.EXPO_PUBLIC_WEB_BASE_URL
 export type DropInPayload = {
   eventId: string
   wrestlerName: string
-  wrestlerDob: string
+  wrestlerGraduationYear: string
   wrestlerWeight?: string
   parentName: string
   parentEmail: string
@@ -34,17 +34,13 @@ export async function createDropInCheckout(payload: DropInPayload): Promise<stri
   return data.checkoutUrl
 }
 
-/** Server enforces 5–18; checked here too so the user isn't sent to Stripe only to bounce. */
-export function ageFromDob(input: string): number | null {
-  const m = input.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
-  if (!m) return null
-  const [, mm, dd, yyyy] = m
-  const dob = new Date(Number(yyyy), Number(mm) - 1, Number(dd))
-  if (Number.isNaN(dob.getTime())) return null
-  const now = new Date()
-  let age = now.getFullYear() - dob.getFullYear()
-  const before = now.getMonth() < dob.getMonth() || (now.getMonth() === dob.getMonth() && now.getDate() < dob.getDate())
-  if (before) age -= 1
-  return age
+/**
+ * Mirrors lib/athlete-graduation-year.ts in the web app. Drop-ins are middle school and high
+ * school only, and a valid graduation year is that check — seniors graduate at the end of the
+ * current school year, current sixth graders six years later.
+ */
+export function graduationYearOptions(now: Date = new Date()): number[] {
+  const seniors = now.getMonth() >= 7 ? now.getFullYear() + 1 : now.getFullYear()
+  return Array.from({ length: 7 }, (_, i) => seniors + i)
 }
 

@@ -15,7 +15,7 @@ import { router, useLocalSearchParams } from "expo-router"
 import * as WebBrowser from "expo-web-browser"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors, radius, space, type } from "@/theme/tokens"
-import { ageFromDob, createDropInCheckout } from "@/lib/drop-in"
+import { createDropInCheckout, graduationYearOptions } from "@/lib/drop-in"
 
 function Field({
   label,
@@ -58,7 +58,7 @@ export default function DropInScreen() {
   const { eventId, title, date } = useLocalSearchParams<{ eventId: string; title?: string; date?: string }>()
 
   const [wrestlerName, setWrestlerName] = useState("")
-  const [wrestlerDob, setWrestlerDob] = useState("")
+  const [gradYear, setGradYear] = useState<number | null>(null)
   const [wrestlerWeight, setWrestlerWeight] = useState("")
   const [parentName, setParentName] = useState("")
   const [parentEmail, setParentEmail] = useState("")
@@ -77,9 +77,7 @@ export default function DropInScreen() {
 
   function validate(): string | null {
     if (!wrestlerName.trim()) return "Enter the wrestler's name."
-    const age = ageFromDob(wrestlerDob)
-    if (age == null) return "Enter the wrestler's date of birth as MM/DD/YYYY."
-    if (age < 5 || age > 18) return "Wrestler must be between 5 and 18 years old for drop-in practices."
+    if (gradYear == null) return "Select the wrestler's graduation year."
     if (!parentName.trim()) return "Enter the parent or guardian's name."
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(parentEmail.trim())) return "Enter a valid parent email address."
     if (!waiverAccepted) return "You must accept the Waiver and Release of Liability before continuing."
@@ -98,7 +96,7 @@ export default function DropInScreen() {
       const checkoutUrl = await createDropInCheckout({
         eventId: String(eventId),
         wrestlerName: wrestlerName.trim(),
-        wrestlerDob: wrestlerDob.trim(),
+        wrestlerGraduationYear: String(gradYear),
         wrestlerWeight: wrestlerWeight.trim() || undefined,
         parentName: parentName.trim(),
         parentEmail: parentEmail.trim(),
@@ -137,13 +135,24 @@ export default function DropInScreen() {
 
           <Text style={styles.sectionHeading}>Wrestler</Text>
           <Field label="Full name" value={wrestlerName} onChangeText={setWrestlerName} placeholder="Alex Smith" />
-          <Field
-            label="Date of birth"
-            value={wrestlerDob}
-            onChangeText={setWrestlerDob}
-            placeholder="MM/DD/YYYY"
-            keyboardType="number-pad"
-          />
+          <View style={styles.field}>
+            <Text style={styles.label}>GRADUATION YEAR</Text>
+            <View style={styles.years}>
+              {graduationYearOptions().map((year) => {
+                const active = year === gradYear
+                return (
+                  <Pressable
+                    key={year}
+                    onPress={() => setGradYear(year)}
+                    style={[styles.year, active && styles.yearActive]}
+                  >
+                    <Text style={[styles.yearText, active && styles.yearTextActive]}>{year}</Text>
+                  </Pressable>
+                )
+              })}
+            </View>
+            <Text style={styles.fieldHint}>Drop-ins are open to middle and high school wrestlers.</Text>
+          </View>
           <Field
             label="Weight"
             value={wrestlerWeight}
@@ -225,6 +234,19 @@ const styles = StyleSheet.create({
   field: { marginBottom: space.md },
   label: { ...type.caption, color: colors.textSecondary, fontSize: 10, marginBottom: 6 },
   optional: { color: colors.textMuted, fontWeight: "600" },
+  fieldHint: { ...type.label, color: colors.textMuted, fontWeight: "500", marginTop: 6 },
+  years: { flexDirection: "row", flexWrap: "wrap", gap: space.sm },
+  year: {
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface,
+  },
+  yearActive: { backgroundColor: colors.gold, borderColor: colors.gold },
+  yearText: { ...type.label, color: colors.textSecondary },
+  yearTextActive: { color: colors.ink, fontWeight: "700" },
   input: {
     backgroundColor: colors.surface,
     borderWidth: 1,
