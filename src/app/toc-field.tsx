@@ -14,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context"
 import { router, useLocalSearchParams } from "expo-router"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors, radius, space, type } from "@/theme/tokens"
+import { openAthleteProfile } from "@/lib/profile-link"
 import {
   fetchTocField,
   headlineCredential,
@@ -29,7 +30,12 @@ function AthleteCard({ athlete }: { athlete: TocFieldAthlete }) {
     .join(" · ")
 
   return (
-    <View style={styles.card}>
+    <Pressable
+      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+      onPress={() => openAthleteProfile(athlete.athleteId)}
+      accessibilityRole="link"
+      accessibilityLabel={`${athlete.name} profile`}
+    >
       {athlete.photoUrl ? (
         <Image source={{ uri: athlete.photoUrl }} style={styles.photo} />
       ) : (
@@ -58,7 +64,7 @@ function AthleteCard({ athlete }: { athlete: TocFieldAthlete }) {
           </Text>
         ) : null}
       </View>
-    </View>
+    </Pressable>
   )
 }
 
@@ -258,6 +264,7 @@ const styles = StyleSheet.create({
   chipCountActive: { color: colors.ink },
 
   list: { paddingHorizontal: space.lg, paddingBottom: space.xxl, gap: space.md },
+  cardPressed: { opacity: 0.65 },
   card: {
     flexDirection: "row",
     gap: space.md,

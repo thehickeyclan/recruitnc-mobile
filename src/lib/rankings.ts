@@ -2,6 +2,8 @@ import { supabase } from "./supabase"
 
 export type RankedProspect = {
   id: number
+  /** athletes.id — null when a ranking row was never linked to a directory profile. */
+  athleteId: string | null
   name: string
   highSchool: string | null
   stateResult: string | null
@@ -77,7 +79,7 @@ export async function fetchRankings(graduationYear: number): Promise<RankedProsp
 
   const { data, error } = await supabase
     .from("public_rankings")
-    .select("id, name, high_school, state_result, academic_gpa, ranked_win, prospect_ranking, profile_image_url")
+    .select("id, prospect_id, name, high_school, state_result, academic_gpa, ranked_win, prospect_ranking, profile_image_url")
     .eq("is_published", true)
     .eq("graduation_year", graduationYear)
     .lte("prospect_ranking", maxRankFor(graduationYear))
@@ -88,6 +90,7 @@ export async function fetchRankings(graduationYear: number): Promise<RankedProsp
 
   return (data ?? []).map((r) => ({
     id: r.id,
+    athleteId: (r as { prospect_id?: string | null }).prospect_id ?? null,
     name: r.name ?? "",
     highSchool: meaningful(r.high_school),
     stateResult: meaningful(r.state_result),

@@ -14,6 +14,7 @@ import { router } from "expo-router"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors, radius, space, type } from "@/theme/tokens"
 import { useSession } from "@/lib/auth"
+import { openAthleteProfile } from "@/lib/profile-link"
 import {
   fetchRankingClasses,
   fetchRankings,
@@ -23,8 +24,16 @@ import {
 
 function RankRow({ prospect }: { prospect: RankedProspect }) {
   const podium = prospect.rank <= 3
+  // Not every ranking row is linked to a directory profile. A row without one stays a plain
+  // View rather than a Pressable that does nothing when tapped.
+  const Row = prospect.athleteId ? Pressable : View
   return (
-    <View style={styles.row}>
+    <Row
+      style={({ pressed }: { pressed?: boolean }) => [styles.row, pressed && styles.rowPressed]}
+      onPress={prospect.athleteId ? () => openAthleteProfile(prospect.athleteId) : undefined}
+      accessibilityRole={prospect.athleteId ? "link" : undefined}
+      accessibilityLabel={prospect.athleteId ? `${prospect.name} profile` : undefined}
+    >
       <View style={[styles.rankBadge, podium && styles.rankBadgePodium]}>
         <Text style={[styles.rankText, podium && styles.rankTextPodium]}>{prospect.rank}</Text>
       </View>
@@ -58,7 +67,7 @@ function RankRow({ prospect }: { prospect: RankedProspect }) {
           </View>
         ) : null}
       </View>
-    </View>
+    </Row>
   )
 }
 
@@ -230,6 +239,7 @@ const styles = StyleSheet.create({
   gateButtonText: { ...type.heading, color: colors.ink },
   error: { ...type.body, color: colors.textSecondary, paddingHorizontal: space.xl, textAlign: "center" },
   list: { paddingHorizontal: space.lg, paddingBottom: space.xxl, gap: space.sm },
+  rowPressed: { opacity: 0.65 },
   row: {
     flexDirection: "row",
     alignItems: "center",

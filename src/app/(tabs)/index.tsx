@@ -14,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { Image } from "expo-image"
 import { colors, radius, space, type } from "@/theme/tokens"
+import { openAthleteProfile } from "@/lib/profile-link"
 import { fetchCommits, type Commit } from "@/lib/commits"
 import { FilterChips, type Chip } from "@/components/filter-chips"
 
@@ -51,7 +52,12 @@ function CommitCard({ commit }: { commit: Commit }) {
   const date = formatDate(commit.commitmentdate)
 
   return (
-    <View style={styles.card}>
+    <Pressable
+      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+      onPress={() => openAthleteProfile(commit.id)}
+      accessibilityRole="link"
+      accessibilityLabel={`${commit.name} profile`}
+    >
       {showPhoto ? (
         <Image
           source={{ uri: commit.photourl! }}
@@ -98,7 +104,7 @@ function CommitCard({ commit }: { commit: Commit }) {
         </Text>
       </View>
 
-    </View>
+    </Pressable>
   )
 }
 
@@ -259,6 +265,7 @@ const styles = StyleSheet.create({
   },
   search: { flex: 1, color: colors.text, fontSize: 15, paddingVertical: 4 },
   empty: { ...type.body, color: colors.textMuted, textAlign: "center", paddingVertical: space.xl },
+  cardPressed: { opacity: 0.65 },
   card: {
     flexDirection: "row",
     alignItems: "flex-start",
