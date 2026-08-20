@@ -16,68 +16,99 @@ import { router } from "expo-router"
 import { colors, radius, space, type } from "@/theme/tokens"
 import { AnswerText } from "@/components/answer-text"
 import { askDataDawg, voteOnAnswer, type ChatTurn } from "@/lib/data-dawg"
+import { useSession } from "@/lib/auth"
 
-type Bubble = ChatTurn & { id: string; messageId?: string; vote?: "up" | "down" }
+/** `isError` keeps a failure out of the history we replay — see `send`. */
+type Bubble = ChatTurn & { id: string; messageId?: string; vote?: "up" | "down"; isError?: boolean }
 
+/**
+ * Every chip is a prompt the website routes to a deterministic handler
+ * (`SUGGESTED_PROMPT_ROUTES`), so the questions we put in front of people are the ones that
+ * never depend on the model picking the right tool. The previous three went to the LLM.
+ */
 const SUGGESTIONS = [
-  "Who committed to NC State?",
-  "Top ranked class of 2027 wrestlers",
-  "Which colleges signed the most NC wrestlers?",
+  "Who are our 4x state champions?",
+  "Show me all class of 2027 rankings",
+  "Who is the all-time winningest wrestler?",
 ]
 
 export default function AskScreen() {
+  const { session } = useSession()
   const [messages, setMessages] = useState<Bubble[]>([])
   const [input, setInput] = useState("")
   const [busy, setBusy] = useState(false)
   const listRef = useRef<FlatList<Bubble>>(null)
+  const abortRef = useRef<AbortController | null>(null)
+
+  const cancel = useCallback(() => {
+    abortRef.current?.abort()
+    abortRef.current = null
+    setBusy(false)
+  }, [])
 
   const send = useCallback(
     async (text: string) => {
       const question = text.trim()
       if (!question || busy) return
 
-      const history: ChatTurn[] = messages.map((m) => ({ role: m.role, content: m.content }))
+      // A failed request is not something Data Dawg said. Replaying "Network request failed"
+      // as an assistant turn told the model it had answered that way, and it answered in kind.
+      const history: ChatTurn[] = messages
+        .filter((m) => !m.isError)
+        .map((m) => ({ role: m.role, content: m.content }))
       const userBubble: Bubble = { id: `u-${Date.now()}`, role: "user", content: question }
 
       setMessages((prev) => [...prev, userBubble])
       setInput("")
       setBusy(true)
 
+      const controller = new AbortController()
+      abortRef.current = controller
+
       try {
-        const reply = await askDataDawg(question, history)
+        const reply = await askDataDawg(question, history, {
+          accessToken: session?.access_token,
+          signal: controller.signal,
+        })
         setMessages((prev) => [
           ...prev,
           { id: `a-${Date.now()}`, role: "assistant", content: reply.answer, messageId: reply.messageId },
         ])
       } catch (e) {
+        // A cancel is the user's own doing — no need to report it back to them.
+        if (controller.signal.aborted) return
         setMessages((prev) => [
           ...prev,
           {
             id: `e-${Date.now()}`,
             role: "assistant",
+            isError: true,
             content: e instanceof Error ? e.message : "Something went wrong.",
           },
         ])
       } finally {
+        if (abortRef.current === controller) abortRef.current = null
         setBusy(false)
         requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }))
       }
     },
-    [busy, messages],
+    [busy, messages, session?.access_token],
   )
 
-  const vote = useCallback((bubble: Bubble, choice: "up" | "down") => {
-    if (!bubble.messageId) return
-    setMessages((prev) => prev.map((m) => (m.id === bubble.id ? { ...m, vote: choice } : m)))
-    void voteOnAnswer(bubble.messageId, choice)
-  }, [])
+  const vote = useCallback(
+    (bubble: Bubble, choice: "up" | "down") => {
+      if (!bubble.messageId) return
+      setMessages((prev) => prev.map((m) => (m.id === bubble.id ? { ...m, vote: choice } : m)))
+      void voteOnAnswer(bubble.messageId, choice, session?.access_token)
+    },
+    [session?.access_token],
+  )
 
   return (
     <SafeAreaView style={styles.screen} edges={["top"]}>
       <View style={styles.header}>
         <View style={styles.headerRow}>
           <View style={styles.flexShrink}>
-            <Text style={styles.eyebrow}>NC UNITED</Text>
             <Text style={styles.title} maxFontSizeMultiplier={1.4}>Data Dawg</Text>
           </View>
           <Pressable onPress={() => router.back()} hitSlop={12} accessibilityLabel="Close">
@@ -145,6 +176,9 @@ export default function AskScreen() {
           <View style={styles.thinking}>
             <ActivityIndicator color={colors.gold} size="small" />
             <Text style={styles.thinkingText}>Data Dawg is digging…</Text>
+            <Pressable onPress={cancel} hitSlop={10} accessibilityLabel="Stop this question">
+              <Text style={styles.cancelText}>Stop</Text>
+            </Pressable>
           </View>
         ) : null}
 
@@ -177,7 +211,6 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: space.md },
   headerRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" },
   flexShrink: { flexShrink: 1 },
-  eyebrow: { ...type.caption, color: colors.gold, marginBottom: space.xs },
   title: { ...type.display, color: colors.text },
   subtitle: { ...type.body, color: colors.textSecondary, marginTop: space.xs },
   empty: { flex: 1, alignItems: "center", justifyContent: "center", gap: space.md, paddingHorizontal: space.lg },
@@ -211,6 +244,7 @@ const styles = StyleSheet.create({
   voteRow: { flexDirection: "row", gap: space.lg, marginTop: space.md },
   thinking: { flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: space.lg, paddingBottom: space.sm },
   thinkingText: { ...type.label, color: colors.textMuted },
+  cancelText: { ...type.label, color: colors.gold, textDecorationLine: "underline" },
   composer: {
     flexDirection: "row",
     alignItems: "flex-end",
