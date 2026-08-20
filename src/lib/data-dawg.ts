@@ -1,10 +1,21 @@
 const BASE = process.env.EXPO_PUBLIC_WEB_BASE_URL
 
-if (!BASE) {
-  // supabase.ts throws on its own missing vars for the same reason. Without this the app builds
-  // a request to "undefined/api/..." and every question fails with "Network request failed",
-  // which tells nobody anything. Fail where the cause is legible.
-  throw new Error("Missing EXPO_PUBLIC_WEB_BASE_URL")
+/**
+ * Checked per call, not at module scope.
+ *
+ * Without the check the app builds a request to "undefined/api/..." and every question fails
+ * as "Network request failed", which tells nobody anything. But throwing at import time would
+ * take the whole app down before a screen renders — `ask.tsx` is a route file, so Expo Router
+ * pulls this module in while it builds the route tree. A missing base URL should break Data
+ * Dawg with a legible message, not the app.
+ */
+function baseUrl(): string {
+  if (!BASE) {
+    throw new Error(
+      "This build has no EXPO_PUBLIC_WEB_BASE_URL, so Data Dawg cannot reach the server.",
+    )
+  }
+  return BASE
 }
 
 /** The route's own ceiling is 120s. Give up first, so the UI is never stuck with no recourse. */
@@ -39,7 +50,7 @@ export async function askDataDawg(
   history: ChatTurn[],
   opts: { accessToken?: string | null; signal?: AbortSignal } = {},
 ): Promise<DawgReply> {
-  const response = await fetch(`${BASE}/api/ai/data-dawg-agent`, {
+  const response = await fetch(`${baseUrl()}/api/ai/data-dawg-agent`, {
     method: "POST",
     headers: requestHeaders(opts.accessToken),
     body: JSON.stringify({
@@ -68,7 +79,7 @@ export async function voteOnAnswer(
   vote: "up" | "down",
   accessToken?: string | null,
 ): Promise<void> {
-  await fetch(`${BASE}/api/ai/data-dawg-agent`, {
+  await fetch(`${baseUrl()}/api/ai/data-dawg-agent`, {
     method: "POST",
     headers: requestHeaders(accessToken),
     body: JSON.stringify({ message: "", feedback: vote, messageId, project: PROJECT }),
