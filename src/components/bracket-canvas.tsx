@@ -21,6 +21,14 @@ type Props = {
   layout: BracketLayout
   /** Bout number → the athlete picked to win it. */
   winners: Record<number, string | null>
+  /**
+   * Bout number → who is actually in it once the picks are applied.
+   *
+   * The layout is computed once, from a draw with no picks, so its own slots still say
+   * "Winner of 1" forever. Advancing someone has to change what the next round reads, and
+   * that resolution happens in the app — so it arrives here rather than in the geometry.
+   */
+  resolved?: Record<number, { top: BracketSlotDisplay; bottom: BracketSlotDisplay }>
   onPickWinner: (boutNumber: number, competitorId: string) => void
 }
 
@@ -67,14 +75,18 @@ function MatchCard({
   match,
   layout,
   winnerId,
+  resolved,
   onPickWinner,
 }: {
   match: BracketLayoutMatch
   layout: BracketLayout
   winnerId: string | null
+  resolved?: { top: BracketSlotDisplay; bottom: BracketSlotDisplay }
   onPickWinner: Props["onPickWinner"]
 }) {
   const bout = match.boutNumber
+  const top = resolved?.top ?? match.top
+  const bottom = resolved?.bottom ?? match.bottom
   const slotHeight = layout.slotHeight
 
   const pressFor = (slot: BracketSlotDisplay) =>
@@ -90,24 +102,24 @@ function MatchCard({
         </View>
       ) : null}
       <Slot
-        slot={match.top}
+        slot={top}
         isTop
         height={slotHeight}
-        won={winnerId != null && winnerId === match.top.competitorId}
-        onPress={pressFor(match.top)}
+        won={winnerId != null && winnerId === top.competitorId}
+        onPress={pressFor(top)}
       />
       <Slot
-        slot={match.bottom}
+        slot={bottom}
         isTop={false}
         height={slotHeight}
-        won={winnerId != null && winnerId === match.bottom.competitorId}
-        onPress={pressFor(match.bottom)}
+        won={winnerId != null && winnerId === bottom.competitorId}
+        onPress={pressFor(bottom)}
       />
     </View>
   )
 }
 
-export function BracketCanvas({ layout, winners, onPickWinner }: Props) {
+export function BracketCanvas({ layout, winners, resolved, onPickWinner }: Props) {
   // Room for the round labels above the first card.
   const labelBand = 26
 
@@ -137,6 +149,7 @@ export function BracketCanvas({ layout, winners, onPickWinner }: Props) {
                 match={m}
                 layout={layout}
                 winnerId={m.boutNumber != null ? (winners[m.boutNumber] ?? null) : null}
+                resolved={m.boutNumber != null ? resolved?.[m.boutNumber] : undefined}
                 onPickWinner={onPickWinner}
               />
             ))}

@@ -6,7 +6,7 @@ import { router, useLocalSearchParams } from "expo-router"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors, radius, space, type } from "@/theme/tokens"
 import { fetchTocField, type TocField, type TocFieldAthlete } from "@/lib/toc-field"
-import { buildBracketPreview, type BracketPreview } from "@/lib/toc-bracket"
+import { buildBracketPreview, slotLabel, slotSeed, type BracketPreview } from "@/lib/toc-bracket"
 import { BracketCanvas } from "@/components/bracket-canvas"
 import { championOf, pickProgress, simulate, updatePick, type SimulationPicks } from "@/lib/bracket-simulation"
 
@@ -140,6 +140,23 @@ export default function TocBracketScreen() {
     for (const bout of simulated?.bouts ?? []) out[bout.boutNumber] = bout.winnerAthleteId
     return out
   }, [simulated])
+  /** Who is in each bout once the picks are applied — the layout alone never changes. */
+  const resolvedByBout = useMemo(() => {
+    const out: Record<number, { top: any; bottom: any }> = {}
+    for (const bout of simulated?.bouts ?? []) {
+      const asDisplay = (slot: (typeof bout)["top"]) => ({
+        name: slotLabel(simulated!, slot),
+        subtitle: null,
+        seed: slotSeed(simulated!, slot),
+        isOpen: slot.kind !== "athlete" || slotSeed(simulated!, slot) == null,
+        photoUrl: null,
+        competitorId: slot.kind === "athlete" ? slot.athleteId : null,
+      })
+      out[bout.boutNumber] = { top: asDisplay(bout.top), bottom: asDisplay(bout.bottom) }
+    }
+    return out
+  }, [simulated])
+
   const progress = simulated ? pickProgress(simulated, picks) : { picked: 0, total: 0 }
   const champion = simulated ? championOf(simulated, picks) : null
   const championName = champion ? (byId.get(champion)?.name ?? null) : null
@@ -284,6 +301,7 @@ export default function TocBracketScreen() {
                     <BracketCanvas
                       layout={preview.layout.championship}
                       winners={winnersByBout}
+                      resolved={resolvedByBout}
                       onPickWinner={tapSlot}
                     />
                   </View>
@@ -295,6 +313,7 @@ export default function TocBracketScreen() {
                         <BracketCanvas
                           layout={preview.layout.consolation}
                           winners={winnersByBout}
+                          resolved={resolvedByBout}
                           onPickWinner={tapSlot}
                         />
                       </View>
