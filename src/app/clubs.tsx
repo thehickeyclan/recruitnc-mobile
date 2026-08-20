@@ -178,6 +178,17 @@ export default function ClubsScreen() {
     [rows],
   )
 
+  const selected = useMemo(
+    () => visiblePins.find((c) => c.id === selectedId) ?? null,
+    [visiblePins, selectedId],
+  )
+
+  // A pin that is no longer in the filtered set must not stay selected — otherwise searching
+  // leaves a card on screen for a club the map is no longer showing.
+  useEffect(() => {
+    if (selectedId && !visiblePins.some((c) => c.id === selectedId)) setSelectedId(null)
+  }, [visiblePins, selectedId])
+
   const camera = useMemo(() => {
     if (origin) return { coordinates: origin, zoom: 9 }
     return fitCamera(visiblePins)
@@ -238,6 +249,21 @@ export default function ClubsScreen() {
               }}
             />
           </View>
+
+          {selected ? (
+            <View style={styles.selectedWrap}>
+              <View style={styles.selectedHead}>
+                <Text style={styles.selectedLabel}>SELECTED ON MAP</Text>
+                <Pressable onPress={() => setSelectedId(null)} hitSlop={10} accessibilityLabel="Clear selection">
+                  <Ionicons name="close" size={16} color={colors.textMuted} />
+                </Pressable>
+              </View>
+              <ClubRow
+                row={{ kind: "pin", club: selected, miles: origin ? distanceMiles(origin, selected) : null }}
+                onDirections={openDirections}
+              />
+            </View>
+          ) : null}
 
           <View style={styles.controls}>
             <View style={styles.searchBox}>
@@ -322,6 +348,13 @@ const styles = StyleSheet.create({
   },
   map: { flex: 1 },
 
+  selectedWrap: {
+    paddingHorizontal: space.lg,
+    paddingTop: space.md,
+    gap: space.xs,
+  },
+  selectedHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  selectedLabel: { ...type.caption, color: colors.gold },
   controls: {
     flexDirection: "row",
     gap: space.sm,
