@@ -148,6 +148,14 @@ export default function MoreScreen() {
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </Pressable>
+          <View style={styles.rowDivider} />
+          <Pressable style={styles.row} onPress={() => router.push("/toc-bracket")}>
+            <View style={styles.rowBody}>
+              <Text style={styles.rowTitle}>Your Bracket</Text>
+              <Text style={styles.rowDetail}>Seed the field yourself and see the draw</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </Pressable>
         </View>
 
         <Text style={styles.sectionHeading}>FIND A CLUB</Text>
