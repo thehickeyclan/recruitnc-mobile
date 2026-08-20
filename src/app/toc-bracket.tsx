@@ -1,107 +1,153 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native"
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import AsyncStorage from "@react-native-async-storage/async-storage"
-import { router } from "expo-router"
+import { router, useLocalSearchParams } from "expo-router"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors, radius, space, type } from "@/theme/tokens"
 import { fetchTocField, type TocField, type TocFieldAthlete } from "@/lib/toc-field"
-import {
-  boutsByRound,
-  buildBracketPreview,
-  moveInOrder,
-  slotLabel,
-  slotSeed,
-  type BracketPreview,
-} from "@/lib/toc-bracket"
+import { boutsByRound, buildBracketPreview, slotLabel, slotSeed, type BracketPreview } from "@/lib/toc-bracket"
+import { championOf, pickProgress, simulate, updatePick, type SimulationPicks } from "@/lib/bracket-simulation"
 
-/** Orders live on the device. Private by design — nothing is uploaded and nobody else sees them. */
 const ORDER_KEY = "recruitnc.tocBracketOrders"
+const PICKS_KEY = "recruitnc.tocBracketPicks"
 
 type Orders = Record<string, string[]>
+type AllPicks = Record<string, SimulationPicks>
+
+/**
+ * Credential strength, strongest first. Used only to give someone a sensible starting order so
+ * they are not ranking eight strangers from an alphabetical list.
+ *
+ * Derived purely from what the public field already shows. The official seeding lives on the
+ * private field board and must not be inferable here — see public-announced-field.ts.
+ */
+const CREDENTIAL_RANK: Record<string, number> = {
+  "all-american": 0,
+  "state-champion": 1,
+  "state-placer": 2,
+  "state-qualifier": 3,
+}
+
+function defaultOrder(athletes: TocFieldAthlete[]): string[] {
+  return [...athletes]
+    .sort((a, b) => {
+      const ra = CREDENTIAL_RANK[a.credentials[0]?.kind ?? ""] ?? 9
+      const rb = CREDENTIAL_RANK[b.credentials[0]?.kind ?? ""] ?? 9
+      return ra !== rb ? ra - rb : a.name.localeCompare(b.name)
+    })
+    .map((a) => a.athleteId)
+}
 
 export default function TocBracketScreen() {
+  const params = useLocalSearchParams<{ weight?: string }>()
   const [field, setField] = useState<TocField | null>(null)
   const [weight, setWeight] = useState<number | null>(null)
   const [orders, setOrders] = useState<Orders>({})
+  const [allPicks, setAllPicks] = useState<AllPicks>({})
   const [preview, setPreview] = useState<BracketPreview | null>(null)
-  const [tab, setTab] = useState<"order" | "bracket">("order")
   const [loading, setLoading] = useState(true)
-  const [building, setBuilding] = useState(false)
+  const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     void (async () => {
       try {
-        const [f, saved] = await Promise.all([fetchTocField(), AsyncStorage.getItem(ORDER_KEY)])
+        const [f, savedOrders, savedPicks] = await Promise.all([
+          fetchTocField(),
+          AsyncStorage.getItem(ORDER_KEY),
+          AsyncStorage.getItem(PICKS_KEY),
+        ])
         setField(f)
-        setWeight(f.weights[0]?.weightClass ?? null)
-        if (saved) setOrders(JSON.parse(saved) as Orders)
+        const wanted = Number(params.weight)
+        setWeight(
+          Number.isFinite(wanted) && f.weights.some((w) => w.weightClass === wanted)
+            ? wanted
+            : (f.weights[0]?.weightClass ?? null),
+        )
+        if (savedOrders) setOrders(JSON.parse(savedOrders) as Orders)
+        if (savedPicks) setAllPicks(JSON.parse(savedPicks) as AllPicks)
       } catch (e) {
         setError(e instanceof Error ? e.message : "Could not load the field.")
       } finally {
         setLoading(false)
       }
     })()
-  }, [])
+  }, [params.weight])
 
-  const athletes: TocFieldAthlete[] = useMemo(
+  const athletes = useMemo(
     () => field?.weights.find((w) => w.weightClass === weight)?.athletes ?? [],
     [field, weight],
   )
+  const key = String(weight)
+  const byId = useMemo(() => new Map(athletes.map((a) => [a.athleteId, a])), [athletes])
 
-  /**
-   * The order for this weight: whatever they saved, then anyone added to the field since.
-   * A wrestler announced after they last touched this weight joins the bottom rather than
-   * silently vanishing from their bracket.
-   */
-  const order: string[] = useMemo(() => {
-    const ids = athletes.map((a) => a.athleteId)
-    const saved = (orders[String(weight)] ?? []).filter((id) => ids.includes(id))
-    return [...saved, ...ids.filter((id) => !saved.includes(id))]
-  }, [athletes, orders, weight])
+  /** Whatever they seeded, in their order. Empty until they start tapping. */
+  const seeded = useMemo(
+    () => (orders[key] ?? []).filter((id) => byId.has(id)),
+    [orders, key, byId],
+  )
+  const unseeded = useMemo(
+    () => defaultOrder(athletes).filter((id) => !seeded.includes(id)),
+    [athletes, seeded],
+  )
 
-  const persist = useCallback(
+  const picks = allPicks[key] ?? {}
+
+  const saveOrder = useCallback(
     async (next: string[]) => {
-      const merged = { ...orders, [String(weight)]: next }
+      const merged = { ...orders, [key]: next }
       setOrders(merged)
       setPreview(null)
       await AsyncStorage.setItem(ORDER_KEY, JSON.stringify(merged)).catch(() => undefined)
     },
-    [orders, weight],
+    [orders, key],
   )
 
-  const move = useCallback(
-    (from: number, to: number) => {
-      const next = moveInOrder(order, from, to)
-      if (next !== order) void persist(next)
+  const savePicks = useCallback(
+    async (next: SimulationPicks) => {
+      const merged = { ...allPicks, [key]: next }
+      setAllPicks(merged)
+      await AsyncStorage.setItem(PICKS_KEY, JSON.stringify(merged)).catch(() => undefined)
     },
-    [order, persist],
+    [allPicks, key],
   )
 
-  const build = useCallback(async () => {
-    if (weight == null || order.length === 0) return
-    setBuilding(true)
-    setError(null)
-    try {
-      setPreview(await buildBracketPreview(weight, order))
-      setTab("bracket")
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not build that bracket.")
-    } finally {
-      setBuilding(false)
+  /** Build as soon as everyone is seeded — no separate button to press. */
+  useEffect(() => {
+    if (weight == null || seeded.length === 0 || seeded.length !== athletes.length) return
+    let cancelled = false
+    setBusy(true)
+    buildBracketPreview(weight, seeded)
+      .then((p) => !cancelled && setPreview(p))
+      .catch((e) => !cancelled && setError(e instanceof Error ? e.message : "Could not build that bracket."))
+      .finally(() => !cancelled && setBusy(false))
+    return () => {
+      cancelled = true
     }
-  }, [weight, order])
+  }, [weight, seeded, athletes.length])
 
-  const byId = useMemo(() => new Map(athletes.map((a) => [a.athleteId, a])), [athletes])
-  const rounds = preview ? boutsByRound(preview.draw) : []
+  const simulated = useMemo(
+    () => (preview ? simulate(preview.draw, picks) : null),
+    [preview, picks],
+  )
+  const rounds = simulated ? boutsByRound(simulated) : []
+  const progress = simulated ? pickProgress(simulated, picks) : { picked: 0, total: 0 }
+  const champion = simulated ? championOf(simulated, picks) : null
+  const championName = champion ? (byId.get(champion)?.name ?? null) : null
+
+  const tapSlot = useCallback(
+    (boutNumber: number, athleteId: string | null) => {
+      if (!simulated || !athleteId) return
+      void savePicks(updatePick(simulated, picks, boutNumber, athleteId))
+    },
+    [simulated, picks, savePicks],
+  )
+
+  const reset = useCallback(() => {
+    void saveOrder([])
+    void savePicks({})
+  }, [saveOrder, savePicks])
 
   return (
     <SafeAreaView style={styles.screen} edges={["top"]}>
@@ -117,10 +163,6 @@ export default function TocBracketScreen() {
             <Ionicons name="close" size={26} color={colors.textMuted} />
           </Pressable>
         </View>
-        <Text style={styles.subtitle}>
-          Rank the field how you think it should seed, then see the bracket it makes. Saved on this
-          phone only.
-        </Text>
       </View>
 
       {loading ? (
@@ -137,13 +179,8 @@ export default function TocBracketScreen() {
                 onPress={() => {
                   setWeight(tile.weightClass)
                   setPreview(null)
-                  setTab("order")
                 }}
-                style={[
-                  styles.chip,
-                  tile.weightClass === weight && styles.chipActive,
-                  !tile.announced && styles.chipLocked,
-                ]}
+                style={[styles.chip, tile.weightClass === weight && styles.chipActive, !tile.announced && styles.chipLocked]}
               >
                 <Text
                   style={[
@@ -164,79 +201,69 @@ export default function TocBracketScreen() {
               <Ionicons name="lock-closed-outline" size={34} color={colors.line} />
               <Text style={styles.emptyTitle}>No weights released yet</Text>
               <Text style={styles.emptyText}>
-                Once a weight class field is announced you can seed it and build your bracket.
+                Once a weight class field is announced you can seed it and run the bracket.
               </Text>
             </View>
           ) : (
-            <>
-              <View style={styles.tabs}>
-                {(["order", "bracket"] as const).map((t) => (
-                  <Pressable
-                    key={t}
-                    onPress={() => (t === "bracket" && !preview ? void build() : setTab(t))}
-                    style={[styles.tab, tab === t && styles.tabActive]}
-                  >
-                    <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>
-                      {t === "order" ? "Your order" : "Bracket"}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-
+            <ScrollView contentContainerStyle={styles.body}>
               {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-              {tab === "order" ? (
-                <ScrollView contentContainerStyle={styles.list}>
-                  {order.map((id, i) => {
-                    const a = byId.get(id)
-                    if (!a) return null
+              {seeded.length < athletes.length ? (
+                <>
+                  <Text style={styles.instruction}>
+                    Tap wrestlers in the order you&apos;d seed them — {seeded.length} of {athletes.length}.
+                  </Text>
+                  {seeded.length > 0 ? (
+                    <View style={styles.seededWrap}>
+                      {seeded.map((id, i) => (
+                        <Pressable
+                          key={id}
+                          style={styles.seededPill}
+                          onPress={() => void saveOrder(seeded.filter((x) => x !== id))}
+                        >
+                          <Text style={styles.seededSeed}>{i + 1}</Text>
+                          <Text style={styles.seededName} numberOfLines={1}>
+                            {byId.get(id)?.name}
+                          </Text>
+                          <Ionicons name="close" size={12} color={colors.ink} />
+                        </Pressable>
+                      ))}
+                    </View>
+                  ) : null}
+
+                  {unseeded.map((id) => {
+                    const a = byId.get(id)!
                     return (
-                      <View key={id} style={styles.row}>
-                        <View style={styles.seedBadge}>
-                          <Text style={styles.seedText}>{i + 1}</Text>
-                        </View>
-                        <View style={styles.rowBody}>
+                      <Pressable key={id} style={styles.pick} onPress={() => void saveOrder([...seeded, id])}>
+                        <View style={styles.pickBody}>
                           <Text style={styles.name} numberOfLines={1}>
                             {a.name}
                           </Text>
-                          {a.club ? (
-                            <Text style={styles.club} numberOfLines={1}>
-                              {a.club}
-                            </Text>
-                          ) : null}
+                          <Text style={styles.sub} numberOfLines={1}>
+                            {[a.credentials[0]?.label, a.club].filter(Boolean).join(" · ")}
+                          </Text>
                         </View>
-                        {/* Arrows rather than drag: reordering by dragging inside a scroll view
-                            is fiddly on a phone, and this is the same operation without the fight. */}
-                        <Pressable onPress={() => move(i, i - 1)} disabled={i === 0} hitSlop={8} style={styles.arrow}>
-                          <Ionicons name="chevron-up" size={20} color={i === 0 ? colors.line : colors.gold} />
-                        </Pressable>
-                        <Pressable
-                          onPress={() => move(i, i + 1)}
-                          disabled={i === order.length - 1}
-                          hitSlop={8}
-                          style={styles.arrow}
-                        >
-                          <Ionicons
-                            name="chevron-down"
-                            size={20}
-                            color={i === order.length - 1 ? colors.line : colors.gold}
-                          />
-                        </Pressable>
-                      </View>
+                        <Ionicons name="add-circle-outline" size={20} color={colors.gold} />
+                      </Pressable>
                     )
                   })}
+                </>
+              ) : busy || !simulated ? (
+                <View style={styles.centre}>
+                  <ActivityIndicator color={colors.gold} />
+                </View>
+              ) : (
+                <>
+                  <View style={styles.statusRow}>
+                    <Text style={styles.status}>
+                      {championName ? `Your champion: ${championName}` : `${progress.picked} of ${progress.total} picked`}
+                    </Text>
+                    <Pressable onPress={reset} hitSlop={8}>
+                      <Text style={styles.resetText}>Start over</Text>
+                    </Pressable>
+                  </View>
 
-                  <Pressable style={styles.build} onPress={() => void build()} disabled={building}>
-                    {building ? (
-                      <ActivityIndicator color={colors.ink} size="small" />
-                    ) : (
-                      <Text style={styles.buildText}>Build my bracket</Text>
-                    )}
-                  </Pressable>
-                </ScrollView>
-              ) : preview ? (
-                <ScrollView contentContainerStyle={styles.list}>
-                  {!preview.official ? (
+                  {!preview?.official ? (
                     <View style={styles.notice}>
                       <Ionicons name="information-circle" size={15} color={colors.gold} />
                       <Text style={styles.noticeText}>
@@ -250,34 +277,36 @@ export default function TocBracketScreen() {
                       <Text style={styles.roundLabel}>{round.toUpperCase()}</Text>
                       {bouts.map((bout) => (
                         <View key={bout.id} style={styles.bout}>
-                          <Text style={styles.boutNumber}>{bout.boutNumber}</Text>
-                          <View style={styles.boutBody}>
-                            {[bout.top, bout.bottom].map((slot, idx) => {
-                              const seed = slotSeed(preview.draw, slot)
-                              return (
-                                <View key={idx} style={styles.slot}>
-                                  {seed != null ? <Text style={styles.slotSeed}>{seed}</Text> : null}
-                                  <Text
-                                    style={[styles.slotName, slot.kind !== "athlete" && styles.slotPending]}
-                                    numberOfLines={1}
-                                  >
-                                    {slotLabel(preview.draw, slot)}
-                                  </Text>
-                                </View>
-                              )
-                            })}
-                          </View>
+                          {[bout.top, bout.bottom].map((slot, idx) => {
+                            const athleteId = slot.kind === "athlete" ? slot.athleteId : null
+                            const seed = slotSeed(simulated, slot)
+                            const won = athleteId != null && bout.winnerAthleteId === athleteId
+                            const tappable = athleteId != null && seed != null
+                            return (
+                              <Pressable
+                                key={idx}
+                                disabled={!tappable}
+                                onPress={() => tapSlot(bout.boutNumber, athleteId)}
+                                style={[styles.slot, won && styles.slotWon, idx === 0 && styles.slotTop]}
+                              >
+                                <Text style={styles.slotSeed}>{seed ?? ""}</Text>
+                                <Text
+                                  style={[styles.slotName, !tappable && styles.slotPending, won && styles.slotNameWon]}
+                                  numberOfLines={1}
+                                >
+                                  {slotLabel(simulated, slot)}
+                                </Text>
+                                {won ? <Ionicons name="checkmark" size={15} color={colors.ink} /> : null}
+                              </Pressable>
+                            )
+                          })}
                         </View>
                       ))}
                     </View>
                   ))}
-                </ScrollView>
-              ) : (
-                <View style={styles.centre}>
-                  <ActivityIndicator color={colors.gold} />
-                </View>
+                </>
               )}
-            </>
+            </ScrollView>
           )}
         </>
       )}
@@ -292,25 +321,18 @@ const styles = StyleSheet.create({
   flexShrink: { flexShrink: 1 },
   eyebrow: { ...type.caption, color: colors.gold, marginBottom: space.xs },
   title: { ...type.display, color: colors.text },
-  subtitle: { ...type.body, color: colors.textSecondary, marginTop: space.xs },
 
-  centre: { flex: 1, alignItems: "center", justifyContent: "center", gap: space.md, paddingHorizontal: space.xl },
+  centre: { alignItems: "center", justifyContent: "center", gap: space.md, paddingVertical: space.xxl, paddingHorizontal: space.xl },
   emptyTitle: { ...type.title, color: colors.text, textAlign: "center" },
   emptyText: { ...type.body, color: colors.textMuted, textAlign: "center" },
-  errorText: { ...type.label, color: colors.red, paddingHorizontal: space.lg, paddingTop: space.sm },
+  errorText: { ...type.label, color: colors.red },
 
   chipScroll: { flexGrow: 0, flexShrink: 0 },
   chips: { paddingHorizontal: space.lg, gap: space.sm, paddingBottom: space.md, alignItems: "center" },
   chip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: space.md,
-    paddingVertical: space.sm,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.raised,
+    flexDirection: "row", alignItems: "center", gap: 6,
+    paddingHorizontal: space.md, paddingVertical: space.sm,
+    borderRadius: radius.pill, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.raised,
   },
   chipActive: { backgroundColor: colors.gold, borderColor: colors.gold },
   chipLocked: { backgroundColor: colors.surface, opacity: 0.55 },
@@ -318,83 +340,49 @@ const styles = StyleSheet.create({
   chipTextActive: { color: colors.ink },
   chipTextLocked: { color: colors.textMuted },
 
-  tabs: { flexDirection: "row", gap: space.sm, paddingHorizontal: space.lg, paddingBottom: space.sm },
-  tab: {
-    paddingHorizontal: space.lg,
-    paddingVertical: space.sm,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.line,
-  },
-  tabActive: { backgroundColor: colors.raised, borderColor: colors.gold },
-  tabText: { ...type.label, color: colors.textMuted },
-  tabTextActive: { color: colors.gold },
+  body: { paddingHorizontal: space.lg, paddingBottom: space.xxl, gap: space.sm },
+  instruction: { ...type.body, color: colors.textSecondary, marginBottom: space.xs },
 
-  list: { paddingHorizontal: space.lg, paddingBottom: space.xxl, gap: space.sm },
+  seededWrap: { flexDirection: "row", flexWrap: "wrap", gap: space.sm, marginBottom: space.sm },
+  seededPill: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    backgroundColor: colors.gold, borderRadius: radius.pill,
+    paddingHorizontal: space.md, paddingVertical: 6, maxWidth: "100%",
+  },
+  seededSeed: { ...type.caption, color: colors.ink, fontWeight: "700" },
+  seededName: { ...type.label, color: colors.ink, flexShrink: 1 },
 
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: space.md,
-    backgroundColor: colors.raised,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: radius.lg,
-    paddingHorizontal: space.md,
-    paddingVertical: space.sm,
+  pick: {
+    flexDirection: "row", alignItems: "center", gap: space.md,
+    backgroundColor: colors.raised, borderWidth: 1, borderColor: colors.line,
+    borderRadius: radius.lg, paddingHorizontal: space.md, paddingVertical: space.md,
   },
-  seedBadge: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: colors.gold,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  seedText: { ...type.label, color: colors.ink, fontWeight: "700" },
-  rowBody: { flex: 1 },
+  pickBody: { flex: 1 },
   name: { ...type.heading, color: colors.text },
-  club: { ...type.label, color: colors.textMuted },
-  arrow: { padding: 2 },
+  sub: { ...type.label, color: colors.textMuted },
 
-  build: {
-    marginTop: space.md,
-    backgroundColor: colors.gold,
-    borderRadius: radius.pill,
-    paddingVertical: space.md,
-    alignItems: "center",
-  },
-  buildText: { ...type.label, color: colors.ink, fontWeight: "700" },
+  statusRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  status: { ...type.label, color: colors.gold, flexShrink: 1 },
+  resetText: { ...type.label, color: colors.textMuted, textDecorationLine: "underline" },
 
   notice: {
-    flexDirection: "row",
-    gap: space.sm,
-    alignItems: "flex-start",
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: radius.md,
-    padding: space.md,
+    flexDirection: "row", gap: space.sm, alignItems: "flex-start",
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line,
+    borderRadius: radius.md, padding: space.md,
   },
   noticeText: { ...type.label, color: colors.textSecondary, flex: 1 },
 
   round: { marginTop: space.lg, gap: space.sm },
   roundLabel: { ...type.caption, color: colors.gold },
-  bout: {
-    flexDirection: "row",
-    gap: space.md,
-    alignItems: "center",
-    backgroundColor: colors.raised,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: radius.md,
-    paddingHorizontal: space.md,
-    paddingVertical: space.sm,
+  bout: { borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, overflow: "hidden" },
+  slot: {
+    flexDirection: "row", alignItems: "center", gap: space.sm,
+    backgroundColor: colors.raised, paddingHorizontal: space.md, paddingVertical: space.sm,
   },
-  boutNumber: { ...type.caption, color: colors.textMuted, width: 16 },
-  boutBody: { flex: 1, gap: 4 },
-  slot: { flexDirection: "row", alignItems: "center", gap: space.sm },
-  slotSeed: { ...type.caption, color: colors.gold, width: 14 },
+  slotTop: { borderBottomWidth: 1, borderBottomColor: colors.line },
+  slotWon: { backgroundColor: colors.gold },
+  slotSeed: { ...type.caption, color: colors.textMuted, width: 14 },
   slotName: { ...type.body, color: colors.text, flex: 1 },
+  slotNameWon: { color: colors.ink, fontWeight: "700" },
   slotPending: { color: colors.textMuted, fontStyle: "italic" },
 })

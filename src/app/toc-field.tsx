@@ -130,6 +130,20 @@ export default function TocFieldScreen() {
         <Text style={styles.subtitle}>
           Announced by weight class. Listed alphabetically — the field is not seeded.
         </Text>
+
+        {/* One tap from the reveal someone was just alerted about, with the weight carried over. */}
+        <Pressable
+          style={styles.bracketCta}
+          onPress={() =>
+            router.push({
+              pathname: "/toc-bracket",
+              params: selected != null ? { weight: String(selected) } : {},
+            })
+          }
+        >
+          <Ionicons name="git-network" size={15} color={colors.ink} />
+          <Text style={styles.bracketCtaText}>Seed it yourself and run the bracket</Text>
+        </Pressable>
       </View>
 
       {loading ? (
@@ -229,6 +243,17 @@ const styles = StyleSheet.create({
   title: { ...type.display, color: colors.text },
   subtitle: { ...type.body, color: colors.textSecondary, marginTop: space.xs },
 
+  bracketCta: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: space.sm,
+    marginTop: space.md,
+    backgroundColor: colors.gold,
+    borderRadius: radius.pill,
+    paddingVertical: space.sm,
+  },
+  bracketCtaText: { ...type.label, color: colors.ink, fontWeight: "700" },
   centre: { flex: 1, alignItems: "center", justifyContent: "center", gap: space.md, paddingHorizontal: space.xl },
   errorText: { ...type.body, color: colors.textSecondary, textAlign: "center" },
   retry: {
