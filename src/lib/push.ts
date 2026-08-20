@@ -10,14 +10,24 @@ export type AlertPrefs = {
   rankings: boolean
   events: boolean
   toc: boolean
+  news: boolean
 }
 
 /**
- * `toc` defaults on. The weight-class reveal cadence is the reason a lot of these installs
- * happen in the run-up to September, so a device that never opens More still hears about a
- * weight going live.
+ * What a new install hears by default.
+ *
+ * Commits, rankings, TOC and news are the things people follow the app for, and each fires
+ * only when something genuinely new is published — a handful of times a week at most. Practice
+ * reminders default off because they fire the day before every event on the calendar, which is
+ * a daily notification most people did not ask for.
  */
-export const DEFAULT_PREFS: AlertPrefs = { commits: true, rankings: false, events: false, toc: true }
+export const DEFAULT_PREFS: AlertPrefs = {
+  commits: true,
+  rankings: true,
+  events: false,
+  toc: true,
+  news: true,
+}
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({

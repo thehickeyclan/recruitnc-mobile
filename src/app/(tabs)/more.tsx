@@ -15,12 +15,13 @@ const WEB = process.env.EXPO_PUBLIC_WEB_BASE_URL
 const ALERTS: { key: keyof AlertPrefs; title: string; detail: string }[] = [
   { key: "commits", title: "New commitments", detail: "When a North Carolina wrestler commits to a college" },
   { key: "rankings", title: "Ranking updates", detail: "When a new class ranking is published" },
-  { key: "events", title: "Practice reminders", detail: "Before practices and drop-in sessions" },
+  { key: "news", title: "News", detail: "Every new article as it goes up" },
   {
     key: "toc",
     title: "Tournament of Champions",
     detail: "The moment a weight class field is released",
   },
+  { key: "events", title: "Calendar reminders", detail: "The day before practices and events" },
 ]
 
 export default function MoreScreen() {
