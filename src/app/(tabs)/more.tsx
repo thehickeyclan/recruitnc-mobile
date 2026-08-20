@@ -149,6 +149,17 @@ export default function MoreScreen() {
           </Pressable>
         </View>
 
+        <Text style={styles.sectionHeading}>FIND A CLUB</Text>
+        <View style={styles.group}>
+          <Pressable style={styles.row} onPress={() => router.push("/clubs")}>
+            <View style={styles.rowBody}>
+              <Text style={styles.rowTitle}>Club finder</Text>
+              <Text style={styles.rowDetail}>Every North Carolina club, on a map</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </Pressable>
+        </View>
+
         <Text style={styles.sectionHeading}>ALERTS</Text>
 
         {!enabled ? (

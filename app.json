@@ -40,7 +40,14 @@
       ],
       "expo-web-browser",
       "expo-image",
-      "expo-status-bar"
+      "expo-status-bar",
+      [
+        "expo-maps",
+        {
+          "requestLocationPermission": true,
+          "locationPermission": "Show wrestling clubs near you on the map."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
