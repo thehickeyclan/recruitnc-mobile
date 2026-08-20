@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { boutsByRound, moveInOrder, slotLabel, slotSeed, type BracketDraw } from "./toc-bracket"
+import { boutsByRound, connectorSegments, moveInOrder, slotLabel, slotSeed, type BracketDraw } from "./toc-bracket"
 
 const draw: BracketDraw = {
   weightClass: 117,
@@ -76,5 +76,31 @@ describe("moveInOrder", () => {
     const items = ["a", "b", "c"]
     moveInOrder(items, 0, 2)
     expect(items).toEqual(["a", "b", "c"])
+  })
+})
+
+describe("connectorSegments", () => {
+  it("turns an elbow into three rectangles", () => {
+    const segs = connectorSegments("M 10 20 H 30 V 60 H 50", 1)
+    expect(segs).toEqual([
+      { left: 10, top: 20, width: 20, height: 1 },
+      { left: 30, top: 20, width: 1, height: 40 },
+      { left: 30, top: 60, width: 20, height: 1 },
+    ])
+  })
+
+  it("handles an elbow that goes upward", () => {
+    const segs = connectorSegments("M 10 60 H 30 V 20 H 50", 1)
+    expect(segs[1]).toEqual({ left: 30, top: 20, width: 1, height: 40 })
+  })
+
+  it("drops a zero-length leg rather than drawing a dot", () => {
+    // Same centre line: the vertical leg has no height.
+    const segs = connectorSegments("M 10 20 H 30 V 20 H 50", 1)
+    expect(segs.some((s) => s.width === 1 && s.height === 0)).toBe(false)
+  })
+
+  it("returns nothing for a path it cannot read", () => {
+    expect(connectorSegments("nonsense")).toEqual([])
   })
 })

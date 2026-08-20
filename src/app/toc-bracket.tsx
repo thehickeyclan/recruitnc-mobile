@@ -6,7 +6,8 @@ import { router, useLocalSearchParams } from "expo-router"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors, radius, space, type } from "@/theme/tokens"
 import { fetchTocField, type TocField, type TocFieldAthlete } from "@/lib/toc-field"
-import { boutsByRound, buildBracketPreview, slotLabel, slotSeed, type BracketPreview } from "@/lib/toc-bracket"
+import { buildBracketPreview, type BracketPreview } from "@/lib/toc-bracket"
+import { BracketCanvas } from "@/components/bracket-canvas"
 import { championOf, pickProgress, simulate, updatePick, type SimulationPicks } from "@/lib/bracket-simulation"
 
 const ORDER_KEY = "recruitnc.tocBracketOrders"
@@ -131,7 +132,11 @@ export default function TocBracketScreen() {
     () => (preview ? simulate(preview.draw, picks) : null),
     [preview, picks],
   )
-  const rounds = simulated ? boutsByRound(simulated) : []
+  const winnersByBout = useMemo(() => {
+    const out: Record<number, string | null> = {}
+    for (const bout of simulated?.bouts ?? []) out[bout.boutNumber] = bout.winnerAthleteId
+    return out
+  }, [simulated])
   const progress = simulated ? pickProgress(simulated, picks) : { picked: 0, total: 0 }
   const champion = simulated ? championOf(simulated, picks) : null
   const championName = champion ? (byId.get(champion)?.name ?? null) : null
@@ -272,38 +277,27 @@ export default function TocBracketScreen() {
                     </View>
                   ) : null}
 
-                  {rounds.map(({ round, bouts }) => (
-                    <View key={round} style={styles.round}>
-                      <Text style={styles.roundLabel}>{round.toUpperCase()}</Text>
-                      {bouts.map((bout) => (
-                        <View key={bout.id} style={styles.bout}>
-                          {[bout.top, bout.bottom].map((slot, idx) => {
-                            const athleteId = slot.kind === "athlete" ? slot.athleteId : null
-                            const seed = slotSeed(simulated, slot)
-                            const won = athleteId != null && bout.winnerAthleteId === athleteId
-                            const tappable = athleteId != null && seed != null
-                            return (
-                              <Pressable
-                                key={idx}
-                                disabled={!tappable}
-                                onPress={() => tapSlot(bout.boutNumber, athleteId)}
-                                style={[styles.slot, won && styles.slotWon, idx === 0 && styles.slotTop]}
-                              >
-                                <Text style={styles.slotSeed}>{seed ?? ""}</Text>
-                                <Text
-                                  style={[styles.slotName, !tappable && styles.slotPending, won && styles.slotNameWon]}
-                                  numberOfLines={1}
-                                >
-                                  {slotLabel(simulated, slot)}
-                                </Text>
-                                {won ? <Ionicons name="checkmark" size={15} color={colors.ink} /> : null}
-                              </Pressable>
-                            )
-                          })}
-                        </View>
-                      ))}
-                    </View>
-                  ))}
+                  <View style={styles.canvasWrap}>
+                    <BracketCanvas
+                      layout={preview!.layout.championship}
+                      winners={winnersByBout}
+                      onPickWinner={tapSlot}
+                    />
+                  </View>
+
+                  {preview!.layout.consolation ? (
+                    <>
+                      <Text style={styles.sideLabel}>CONSOLATION</Text>
+                      <View style={styles.canvasWrap}>
+                        <BracketCanvas
+                          layout={preview!.layout.consolation}
+                          winners={winnersByBout}
+                          onPickWinner={tapSlot}
+                        />
+                      </View>
+                    </>
+                  ) : null}
+
                 </>
               )}
             </ScrollView>
@@ -372,6 +366,16 @@ const styles = StyleSheet.create({
   },
   noticeText: { ...type.label, color: colors.textSecondary, flex: 1 },
 
+  canvasWrap: {
+    marginTop: space.md,
+    marginHorizontal: -space.lg,
+    backgroundColor: colors.ink,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: colors.line,
+    paddingVertical: space.md,
+  },
+  sideLabel: { ...type.caption, color: colors.gold, marginTop: space.xl },
   round: { marginTop: space.lg, gap: space.sm },
   roundLabel: { ...type.caption, color: colors.gold },
   bout: { borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, overflow: "hidden" },
