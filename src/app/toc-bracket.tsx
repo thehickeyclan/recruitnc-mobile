@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native"
+import { useRef } from "react"
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { router, useLocalSearchParams } from "expo-router"
@@ -8,6 +9,7 @@ import { colors, radius, space, type } from "@/theme/tokens"
 import { fetchTocField, type TocField, type TocFieldAthlete } from "@/lib/toc-field"
 import { buildBracketPreview, slotLabel, slotSeed, type BracketPreview } from "@/lib/toc-bracket"
 import { BracketCanvas } from "@/components/bracket-canvas"
+import { shareBracketImage } from "@/lib/share-bracket"
 import { championOf, pickProgress, simulate, updatePick, type SimulationPicks } from "@/lib/bracket-simulation"
 
 const ORDER_KEY = "recruitnc.tocBracketOrders"
@@ -50,6 +52,9 @@ export default function TocBracketScreen() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [sharing, setSharing] = useState(false)
+  /** Points at the content view, not the ScrollView — see share-bracket.ts. */
+  const shareRef = useRef<View>(null)
 
   useEffect(() => {
     void (async () => {
@@ -168,6 +173,15 @@ export default function TocBracketScreen() {
     },
     [simulated, picks, savePicks],
   )
+
+  const share = useCallback(async () => {
+    if (weight == null) return
+    setSharing(true)
+    const outcome = await shareBracketImage(shareRef, weight)
+    if (outcome === "unavailable") setError("Sharing is not available on this device.")
+    if (outcome === "failed") setError("Could not create the image.")
+    setSharing(false)
+  }, [weight])
 
   const reset = useCallback(() => {
     void saveOrder([])
@@ -297,6 +311,24 @@ export default function TocBracketScreen() {
                     </View>
                   ) : null}
 
+                  {/* Everything inside this ref is what gets shared: logo, weight, champion,
+                      championship and consolation — so the image explains itself away from
+                      the app. Laid out at natural size, which is what captureRef needs. */}
+                  <View ref={shareRef} collapsable={false} style={styles.shareCard}>
+                    <View style={styles.shareHead}>
+                      <Image
+                        source={require("../../assets/images/toc-logo.png")}
+                        style={styles.shareLogo}
+                        resizeMode="contain"
+                      />
+                      <View style={styles.flexShrink}>
+                        <Text style={styles.shareWeight}>{weight} lbs</Text>
+                        <Text style={styles.shareSub}>
+                          {championName ? `${championName} takes it` : "Projected bracket"}
+                        </Text>
+                      </View>
+                    </View>
+
                   <View style={styles.canvasWrap}>
                     <BracketCanvas
                       layout={preview.layout.championship}
@@ -320,6 +352,21 @@ export default function TocBracketScreen() {
                     </>
                   ) : null}
 
+                    <Text style={styles.shareFooter}>
+                      NC United Tournament of Champions · 18 September 2026
+                    </Text>
+                  </View>
+
+                  <Pressable style={styles.shareButton} onPress={() => void share()} disabled={sharing}>
+                    {sharing ? (
+                      <ActivityIndicator color={colors.ink} size="small" />
+                    ) : (
+                      <>
+                        <Ionicons name="share-outline" size={16} color={colors.ink} />
+                        <Text style={styles.shareButtonText}>Share my bracket</Text>
+                      </>
+                    )}
+                  </Pressable>
                 </>
               ) : busy ? (
                 <View style={styles.centre}>
@@ -392,6 +439,23 @@ const styles = StyleSheet.create({
   },
   noticeText: { ...type.label, color: colors.textSecondary, flex: 1 },
 
+  shareCard: { backgroundColor: colors.ink, paddingBottom: space.md, gap: space.sm },
+  shareHead: { flexDirection: "row", alignItems: "center", gap: space.md, paddingTop: space.sm },
+  shareLogo: { width: 54, height: 54 },
+  shareWeight: { ...type.title, color: colors.text },
+  shareSub: { ...type.label, color: colors.gold },
+  shareFooter: { ...type.caption, color: colors.textMuted, paddingTop: space.sm },
+  shareButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: space.sm,
+    marginTop: space.md,
+    backgroundColor: colors.gold,
+    borderRadius: radius.pill,
+    paddingVertical: space.md,
+  },
+  shareButtonText: { ...type.label, color: colors.ink, fontWeight: "700" },
   canvasWrap: {
     marginTop: space.md,
     marginHorizontal: -space.lg,

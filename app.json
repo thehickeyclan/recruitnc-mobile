@@ -47,7 +47,8 @@
           "requestLocationPermission": true,
           "locationPermission": "Show wrestling clubs near you on the map."
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,
