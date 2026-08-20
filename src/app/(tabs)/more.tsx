@@ -16,6 +16,11 @@ const ALERTS: { key: keyof AlertPrefs; title: string; detail: string }[] = [
   { key: "commits", title: "New commitments", detail: "When a North Carolina wrestler commits to a college" },
   { key: "rankings", title: "Ranking updates", detail: "When a new class ranking is published" },
   { key: "events", title: "Practice reminders", detail: "Before practices and drop-in sessions" },
+  {
+    key: "toc",
+    title: "Tournament of Champions",
+    detail: "The moment a weight class field is released",
+  },
 ]
 
 export default function MoreScreen() {
@@ -132,6 +137,17 @@ export default function MoreScreen() {
             <Text style={styles.enableText}>Sign in or create an account</Text>
           </Pressable>
         )}
+
+        <Text style={styles.sectionHeading}>TOURNAMENT OF CHAMPIONS</Text>
+        <View style={styles.group}>
+          <Pressable style={styles.row} onPress={() => router.push("/toc-field")}>
+            <View style={styles.rowBody}>
+              <Text style={styles.rowTitle}>The Field</Text>
+              <Text style={styles.rowDetail}>Announced wrestlers, by weight class</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </Pressable>
+        </View>
 
         <Text style={styles.sectionHeading}>ALERTS</Text>
 

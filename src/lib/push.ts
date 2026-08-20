@@ -9,9 +9,15 @@ export type AlertPrefs = {
   commits: boolean
   rankings: boolean
   events: boolean
+  toc: boolean
 }
 
-export const DEFAULT_PREFS: AlertPrefs = { commits: true, rankings: false, events: false }
+/**
+ * `toc` defaults on. The weight-class reveal cadence is the reason a lot of these installs
+ * happen in the run-up to September, so a device that never opens More still hears about a
+ * weight going live.
+ */
+export const DEFAULT_PREFS: AlertPrefs = { commits: true, rankings: false, events: false, toc: true }
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
