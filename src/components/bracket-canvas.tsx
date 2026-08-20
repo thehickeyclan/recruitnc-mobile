@@ -123,10 +123,13 @@ export function BracketCanvas({ layout, winners, resolved, onPickWinner }: Props
   // Room for the round labels above the first card.
   const labelBand = 26
 
+  // Horizontal only. A vertical ScrollView here would sit inside the page's own vertical
+  // ScrollView and the two fight for the gesture — the bracket ate every upward swipe, so the
+  // consolation section below it could not be reached at all. The canvas lays out at its full
+  // height instead and lets the page do the vertical scrolling.
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={styles.hPad}>
-      <ScrollView showsVerticalScrollIndicator contentContainerStyle={styles.vPad}>
-        <View style={{ width: layout.width, height: layout.height + labelBand }}>
+      <View style={{ width: layout.width, height: layout.height + labelBand }}>
           {layout.roundLabels.map((r) => (
             <Text key={r.roundIndex} style={[styles.roundLabel, { left: r.x, width: layout.matchWidth }]}>
               {r.label.toUpperCase()}
@@ -154,15 +157,13 @@ export function BracketCanvas({ layout, winners, resolved, onPickWinner }: Props
               />
             ))}
           </View>
-        </View>
-      </ScrollView>
+      </View>
     </ScrollView>
   )
 }
 
 const styles = StyleSheet.create({
   hPad: { paddingHorizontal: space.lg },
-  vPad: { paddingBottom: space.xl },
 
   roundLabel: {
     position: "absolute",
