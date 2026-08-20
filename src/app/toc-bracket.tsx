@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState, type Ref } from "react"
 import { useRef } from "react"
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
@@ -7,7 +7,13 @@ import { router, useLocalSearchParams } from "expo-router"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors, radius, space, type } from "@/theme/tokens"
 import { fetchTocField, type TocField, type TocFieldAthlete } from "@/lib/toc-field"
-import { buildBracketPreview, slotLabel, slotSeed, type BracketPreview } from "@/lib/toc-bracket"
+import {
+  buildBracketPreview,
+  slotLabel,
+  slotSeed,
+  type BracketPreview,
+  type BracketSlotDisplay,
+} from "@/lib/toc-bracket"
 import { BracketCanvas } from "@/components/bracket-canvas"
 import { shareBracketImage } from "@/lib/share-bracket"
 import { championOf, pickProgress, simulate, updatePick, type SimulationPicks } from "@/lib/bracket-simulation"
@@ -42,6 +48,88 @@ function defaultOrder(athletes: TocFieldAthlete[]): string[] {
     .map((a) => a.athleteId)
 }
 
+/**
+ * The bracket as a self-contained card: logo, weight, who wins it, championship, consolation.
+ *
+ * Rendered twice — once on screen with scrolling canvases so the bracket is tappable on a phone,
+ * once off-screen unscrolled so it can be photographed whole. Sharing a bracket that stops where
+ * the phone's edge happened to fall is worse than not sharing one, and a picture of names with
+ * no logo or weight class means nothing once it leaves the app.
+ */
+function BracketCard({
+  weight,
+  championName,
+  layout,
+  winners,
+  resolved,
+  onPickWinner,
+  scroll = true,
+  cardRef,
+}: {
+  weight: number
+  championName: string | null
+  layout: BracketPreview["layout"]
+  winners: Record<number, string | null>
+  resolved: Record<number, { top: BracketSlotDisplay; bottom: BracketSlotDisplay }>
+  onPickWinner: (boutNumber: number, competitorId: string) => void
+  scroll?: boolean
+  cardRef?: Ref<View>
+}) {
+  // Unscrolled, the card has to be told how wide it is: nothing else constrains it, and both
+  // canvases have to fit the wider of the two so the columns line up down the image.
+  const naturalWidth =
+    Math.max(layout.championship.width, layout.consolation?.width ?? 0) + space.lg * 2
+
+  return (
+    <View
+      ref={cardRef}
+      collapsable={false}
+      style={[styles.shareCard, !scroll && { width: naturalWidth, paddingHorizontal: space.lg }]}
+    >
+      <View style={styles.shareHead}>
+        <Image
+          source={require("../../assets/images/toc-logo.png")}
+          style={styles.shareLogo}
+          resizeMode="contain"
+        />
+        <View style={styles.flexShrink}>
+          <Text style={styles.shareWeight}>{weight} lbs</Text>
+          <Text style={styles.shareSub}>
+            {championName ? `${championName} takes it` : "Projected bracket"}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.canvasWrap}>
+        <BracketCanvas
+          layout={layout.championship}
+          winners={winners}
+          resolved={resolved}
+          onPickWinner={onPickWinner}
+          scroll={scroll}
+        />
+      </View>
+
+      {layout.consolation ? (
+        <>
+          <Text style={styles.sideLabel}>CONSOLATION</Text>
+          <View style={styles.canvasWrap}>
+            <BracketCanvas
+              layout={layout.consolation}
+              winners={winners}
+              resolved={resolved}
+              onPickWinner={onPickWinner}
+              scroll={scroll}
+            />
+          </View>
+        </>
+      ) : null}
+
+      <Text style={styles.shareFooter}>NC United Tournament of Champions · 18 September 2026</Text>
+    </View>
+  )
+}
+
 export default function TocBracketScreen() {
   const params = useLocalSearchParams<{ weight?: string }>()
   const [field, setField] = useState<TocField | null>(null)
@@ -53,7 +141,7 @@ export default function TocBracketScreen() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [sharing, setSharing] = useState(false)
-  /** Points at the content view, not the ScrollView — see share-bracket.ts. */
+  /** Points at the off-screen, unscrolled copy of the card — see share-bracket.ts. */
   const shareRef = useRef<View>(null)
 
   useEffect(() => {
@@ -311,50 +399,29 @@ export default function TocBracketScreen() {
                     </View>
                   ) : null}
 
-                  {/* Everything inside this ref is what gets shared: logo, weight, champion,
-                      championship and consolation — so the image explains itself away from
-                      the app. Laid out at natural size, which is what captureRef needs. */}
-                  <View ref={shareRef} collapsable={false} style={styles.shareCard}>
-                    <View style={styles.shareHead}>
-                      <Image
-                        source={require("../../assets/images/toc-logo.png")}
-                        style={styles.shareLogo}
-                        resizeMode="contain"
-                      />
-                      <View style={styles.flexShrink}>
-                        <Text style={styles.shareWeight}>{weight} lbs</Text>
-                        <Text style={styles.shareSub}>
-                          {championName ? `${championName} takes it` : "Projected bracket"}
-                        </Text>
-                      </View>
-                    </View>
+                  <BracketCard
+                    weight={preview.weightClass}
+                    championName={championName}
+                    layout={preview.layout}
+                    winners={winnersByBout}
+                    resolved={resolvedByBout}
+                    onPickWinner={tapSlot}
+                  />
 
-                  <View style={styles.canvasWrap}>
-                    <BracketCanvas
-                      layout={preview.layout.championship}
+                  {/* The copy that actually gets shared. Same card, laid out off-screen at the
+                      bracket's natural width with no ScrollViews, because captureRef photographs
+                      what is drawn — and a scrolling canvas draws only its viewport. */}
+                  <View style={styles.offscreen} pointerEvents="none">
+                    <BracketCard
+                      cardRef={shareRef}
+                      scroll={false}
+                      weight={preview.weightClass}
+                      championName={championName}
+                      layout={preview.layout}
                       winners={winnersByBout}
                       resolved={resolvedByBout}
                       onPickWinner={tapSlot}
                     />
-                  </View>
-
-                  {preview.layout.consolation ? (
-                    <>
-                      <Text style={styles.sideLabel}>CONSOLATION</Text>
-                      <View style={styles.canvasWrap}>
-                        <BracketCanvas
-                          layout={preview.layout.consolation}
-                          winners={winnersByBout}
-                          resolved={resolvedByBout}
-                          onPickWinner={tapSlot}
-                        />
-                      </View>
-                    </>
-                  ) : null}
-
-                    <Text style={styles.shareFooter}>
-                      NC United Tournament of Champions · 18 September 2026
-                    </Text>
                   </View>
 
                   <Pressable style={styles.shareButton} onPress={() => void share()} disabled={sharing}>
@@ -440,6 +507,9 @@ const styles = StyleSheet.create({
   noticeText: { ...type.label, color: colors.textSecondary, flex: 1 },
 
   shareCard: { backgroundColor: colors.ink, paddingBottom: space.md, gap: space.sm },
+  // Off the left edge rather than hidden: `display: none` and `opacity: 0` both stop it being
+  // drawn, and captureRef can only photograph something that was drawn.
+  offscreen: { position: "absolute", left: -10000, top: 0 },
   shareHead: { flexDirection: "row", alignItems: "center", gap: space.md, paddingTop: space.sm },
   shareLogo: { width: 54, height: 54 },
   shareWeight: { ...type.title, color: colors.text },

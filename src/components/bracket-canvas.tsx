@@ -30,6 +30,15 @@ type Props = {
    */
   resolved?: Record<number, { top: BracketSlotDisplay; bottom: BracketSlotDisplay }>
   onPickWinner: (boutNumber: number, competitorId: string) => void
+  /**
+   * False lays the canvas out at its full natural width with no ScrollView around it.
+   *
+   * That is what makes the bracket shareable. A ScrollView clips to its viewport, and
+   * `captureRef` captures what is drawn — so a screenshot of a scrolling canvas is a picture of
+   * whatever happened to be scrolled into view, not of the bracket. The share card renders an
+   * unscrolled copy off-screen and captures that instead.
+   */
+  scroll?: boolean
 }
 
 function Slot({
@@ -119,16 +128,11 @@ function MatchCard({
   )
 }
 
-export function BracketCanvas({ layout, winners, resolved, onPickWinner }: Props) {
+export function BracketCanvas({ layout, winners, resolved, onPickWinner, scroll = true }: Props) {
   // Room for the round labels above the first card.
   const labelBand = 26
 
-  // Horizontal only. A vertical ScrollView here would sit inside the page's own vertical
-  // ScrollView and the two fight for the gesture — the bracket ate every upward swipe, so the
-  // consolation section below it could not be reached at all. The canvas lays out at its full
-  // height instead and lets the page do the vertical scrolling.
-  return (
-    <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={styles.hPad}>
+  const content = (
       <View style={{ width: layout.width, height: layout.height + labelBand }}>
           {layout.roundLabels.map((r) => (
             <Text key={r.roundIndex} style={[styles.roundLabel, { left: r.x, width: layout.matchWidth }]}>
@@ -158,6 +162,17 @@ export function BracketCanvas({ layout, winners, resolved, onPickWinner }: Props
             ))}
           </View>
       </View>
+  )
+
+  // Horizontal only. A vertical ScrollView here would sit inside the page's own vertical
+  // ScrollView and the two fight for the gesture — the bracket ate every upward swipe, so the
+  // consolation section below it could not be reached at all. The canvas lays out at its full
+  // height instead and lets the page do the vertical scrolling.
+  if (!scroll) return <View style={styles.hPad}>{content}</View>
+
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={styles.hPad}>
+      {content}
     </ScrollView>
   )
 }
