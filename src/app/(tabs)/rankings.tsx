@@ -24,16 +24,12 @@ import {
 
 function RankRow({ prospect }: { prospect: RankedProspect }) {
   const podium = prospect.rank <= 3
-  // Not every ranking row is linked to a directory profile. A row without one stays a plain
-  // View rather than a Pressable that does nothing when tapped.
-  const Row = prospect.athleteId ? Pressable : View
-  return (
-    <Row
-      style={({ pressed }: { pressed?: boolean }) => [styles.row, pressed && styles.rowPressed]}
-      onPress={prospect.athleteId ? () => openAthleteProfile(prospect.athleteId) : undefined}
-      accessibilityRole={prospect.athleteId ? "link" : undefined}
-      accessibilityLabel={prospect.athleteId ? `${prospect.name} profile` : undefined}
-    >
+  // Not every ranking row is linked to a directory profile, and a row without one must not be
+  // a Pressable that does nothing. Two explicit branches rather than a swapped component:
+  // View does not accept a function for `style`, so sharing one element silently broke the
+  // unlinked rows' layout.
+  const body = (
+    <>
       <View style={[styles.rankBadge, podium && styles.rankBadgePodium]}>
         <Text style={[styles.rankText, podium && styles.rankTextPodium]}>{prospect.rank}</Text>
       </View>
@@ -67,7 +63,20 @@ function RankRow({ prospect }: { prospect: RankedProspect }) {
           </View>
         ) : null}
       </View>
-    </Row>
+    </>
+  )
+
+  if (!prospect.athleteId) return <View style={styles.row}>{body}</View>
+
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+      onPress={() => openAthleteProfile(prospect.athleteId)}
+      accessibilityRole="link"
+      accessibilityLabel={`${prospect.name} profile`}
+    >
+      {body}
+    </Pressable>
   )
 }
 
