@@ -2,6 +2,7 @@ import { View, Pressable, Text, StyleSheet } from "react-native"
 import { Tabs, router } from "expo-router"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors } from "@/theme/tokens"
+import { AlertsPrimer } from "@/components/alerts-primer"
 
 export default function TabsLayout() {
   return (
@@ -49,6 +50,9 @@ export default function TabsLayout() {
         }}
       />
     </Tabs>
+
+      {/* Asked once on first launch, before iOS spends its single permission prompt. */}
+      <AlertsPrimer />
 
       {/* Floating Data Dawg launcher — mirrors the website, and keeps the tab bar to five slots. */}
       <Pressable style={styles.fab} onPress={() => router.push("/ask")} accessibilityLabel="Ask Data Dawg">
