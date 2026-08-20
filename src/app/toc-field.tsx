@@ -142,6 +142,9 @@ export default function TocFieldScreen() {
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
+            // Without flexGrow:0 the row is stretched by the parent flex and the chips get
+            // clipped at the baseline; alignItems keeps them their natural height.
+            style={styles.chipScroll}
             contentContainerStyle={styles.chips}
           >
             {(field?.tiles ?? []).map((tile) => {
@@ -233,7 +236,8 @@ const styles = StyleSheet.create({
   emptyTitle: { ...type.title, color: colors.text, textAlign: "center" },
   emptyText: { ...type.body, color: colors.textMuted, textAlign: "center" },
 
-  chips: { paddingHorizontal: space.lg, gap: space.sm, paddingBottom: space.md },
+  chipScroll: { flexGrow: 0, flexShrink: 0 },
+  chips: { paddingHorizontal: space.lg, gap: space.sm, paddingBottom: space.md, alignItems: "center" },
   chip: {
     flexDirection: "row",
     alignItems: "center",
