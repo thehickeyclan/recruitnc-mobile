@@ -114,9 +114,12 @@ export default function TocBracketScreen() {
     [allPicks, key],
   )
 
-  /** Build as soon as everyone is seeded — no separate button to press. */
+  /**
+   * Draw from the very first tap. The builder pads the rest with open spots, so the bracket
+   * fills in as you seed rather than making you do eight taps of work before anything appears.
+   */
   useEffect(() => {
-    if (weight == null || seeded.length === 0 || seeded.length !== athletes.length) return
+    if (weight == null || seeded.length === 0) return
     let cancelled = false
     setBusy(true)
     buildBracketPreview(weight, seeded)
@@ -253,11 +256,11 @@ export default function TocBracketScreen() {
                     )
                   })}
                 </>
-              ) : busy || !simulated ? (
-                <View style={styles.centre}>
-                  <ActivityIndicator color={colors.gold} />
-                </View>
-              ) : (
+              ) : null}
+
+              {/* Shown as soon as there is anything to show, so the bracket grows while you
+                  seed rather than appearing only once the last wrestler is placed. */}
+              {simulated && preview ? (
                 <>
                   <View style={styles.statusRow}>
                     <Text style={styles.status}>
@@ -279,18 +282,18 @@ export default function TocBracketScreen() {
 
                   <View style={styles.canvasWrap}>
                     <BracketCanvas
-                      layout={preview!.layout.championship}
+                      layout={preview.layout.championship}
                       winners={winnersByBout}
                       onPickWinner={tapSlot}
                     />
                   </View>
 
-                  {preview!.layout.consolation ? (
+                  {preview.layout.consolation ? (
                     <>
                       <Text style={styles.sideLabel}>CONSOLATION</Text>
                       <View style={styles.canvasWrap}>
                         <BracketCanvas
-                          layout={preview!.layout.consolation}
+                          layout={preview.layout.consolation}
                           winners={winnersByBout}
                           onPickWinner={tapSlot}
                         />
@@ -299,7 +302,11 @@ export default function TocBracketScreen() {
                   ) : null}
 
                 </>
-              )}
+              ) : busy ? (
+                <View style={styles.centre}>
+                  <ActivityIndicator color={colors.gold} />
+                </View>
+              ) : null}
             </ScrollView>
           )}
         </>
