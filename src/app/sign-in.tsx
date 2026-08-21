@@ -13,10 +13,57 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context"
 import { router, useLocalSearchParams } from "expo-router"
 import Ionicons from "@expo/vector-icons/Ionicons"
+import * as WebBrowser from "expo-web-browser"
 import { colors, radius, space, type } from "@/theme/tokens"
 import { sendPasswordReset, signIn, signUp } from "@/lib/auth"
 
 type Mode = "signin" | "signup"
+
+type Role = "parent" | "athlete" | "fan"
+
+const WEB = process.env.EXPO_PUBLIC_WEB_BASE_URL
+
+/**
+ * Who is signing up.
+ *
+ * The app used to send "parent" for everybody, which made the role column meaningless and — worse
+ * — silently required a phone number, because the signup API demands one for parent and athlete
+ * accounts. The form called that field optional, so anyone who left it blank was rejected by a
+ * rule the screen never mentioned.
+ */
+const ROLES: { value: Role; label: string; hint: string }[] = [
+  { value: "parent", label: "Parent", hint: "Registering a wrestler" },
+  { value: "athlete", label: "Wrestler", hint: "Signing up for myself" },
+  { value: "fan", label: "Fan", hint: "Following the sport" },
+]
+
+/** Parent and athlete accounts need a reachable number; the signup API rejects them without one. */
+function roleNeedsPhone(role: Role | null): boolean {
+  return role === "parent" || role === "athlete"
+}
+
+function RolePicker({ value, onChange }: { value: Role | null; onChange: (r: Role) => void }) {
+  return (
+    <View style={styles.field}>
+      <Text style={styles.label}>I AM A</Text>
+      <View style={styles.roleRow}>
+        {ROLES.map((r) => {
+          const active = value === r.value
+          return (
+            <Pressable
+              key={r.value}
+              onPress={() => onChange(r.value)}
+              style={[styles.role, active && styles.roleActive]}
+            >
+              <Text style={[styles.roleLabel, active && styles.roleLabelActive]}>{r.label}</Text>
+              <Text style={[styles.roleHint, active && styles.roleHintActive]}>{r.hint}</Text>
+            </Pressable>
+          )
+        })}
+      </View>
+    </View>
+  )
+}
 
 function Field({
   label,
@@ -66,6 +113,9 @@ export default function SignInScreen() {
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
   const [cellPhone, setCellPhone] = useState("")
+  const [role, setRole] = useState<Role | null>(null)
+  /** Set after an athlete signs up, so the recruiting-profile prompt survives the flip to sign-in. */
+  const [athleteJustSignedUp, setAthleteJustSignedUp] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -79,15 +129,22 @@ export default function SignInScreen() {
         await signIn(email, password)
         router.back()
       } else {
+        if (!role) throw new Error("Tell us whether you are a parent, a wrestler or a fan.")
         if (!firstName.trim() || !lastName.trim()) throw new Error("Enter your first and last name.")
+        // Checked here as well as on the server so the message names the field the form shows,
+        // rather than the API's wording about account types the user never chose.
+        if (roleNeedsPhone(role) && cellPhone.replace(/\D/g, "").length < 10) {
+          throw new Error("Enter a cell phone number — we need a way to reach you about practices.")
+        }
         await signUp({
           email,
           password,
           firstName: firstName.trim(),
           lastName: lastName.trim(),
           cellPhone: cellPhone.trim() || undefined,
-          profileType: "parent",
+          profileType: role,
         })
+        setAthleteJustSignedUp(role === "athlete")
         setNotice("Account created. Check your email for the verification link, then sign in.")
         setMode("signin")
       }
@@ -128,6 +185,7 @@ export default function SignInScreen() {
 
           {mode === "signup" ? (
             <>
+              <RolePicker value={role} onChange={setRole} />
               <Field label="First name" value={firstName} onChangeText={setFirstName} placeholder="Jordan" />
               <Field label="Last name" value={lastName} onChangeText={setLastName} placeholder="Smith" />
               <Field
@@ -136,7 +194,7 @@ export default function SignInScreen() {
                 onChangeText={setCellPhone}
                 placeholder="(919) 555-0134"
                 keyboardType="phone-pad"
-                optional
+                optional={!roleNeedsPhone(role)}
               />
             </>
           ) : null}
@@ -160,6 +218,33 @@ export default function SignInScreen() {
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
           {notice ? <Text style={styles.notice}>{notice}</Text> : null}
+
+          {/* A wrestler who signs up and stops there is invisible to the coaches searching this
+              site, which is the whole reason they signed up. The prompt is deliberately shown
+              after the account exists rather than as another step before it. */}
+          {athleteJustSignedUp ? (
+            <View style={styles.recruit}>
+              <Text style={styles.recruitTitle}>Get in front of college coaches</Text>
+              <Text style={styles.recruitBody}>
+                Verify your email and sign in, then build your recruiting profile — results, weight,
+                graduation year and film, in the place coaches already look.
+              </Text>
+              <Pressable
+                style={styles.recruitButton}
+                onPress={() =>
+                  void WebBrowser.openBrowserAsync(`${WEB}/create-profile`, {
+                    presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
+                    toolbarColor: colors.ink,
+                    controlsColor: colors.gold,
+                    dismissButtonStyle: "done",
+                  }).catch(() => undefined)
+                }
+              >
+                <Ionicons name="person-add-outline" size={16} color={colors.ink} />
+                <Text style={styles.recruitButtonText}>Build my recruiting profile</Text>
+              </Pressable>
+            </View>
+          ) : null}
 
           <Pressable style={[styles.submit, busy && styles.disabled]} onPress={() => void submit()} disabled={busy}>
             {busy ? (
@@ -227,6 +312,46 @@ const styles = StyleSheet.create({
   },
   disabled: { opacity: 0.6 },
   submitText: { ...type.heading, color: colors.ink },
+  roleRow: { flexDirection: "row", gap: space.sm },
+  role: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radius.md,
+    paddingVertical: space.md,
+    paddingHorizontal: space.sm,
+    gap: 2,
+  },
+  roleActive: { backgroundColor: colors.gold, borderColor: colors.gold },
+  roleLabel: { ...type.label, color: colors.text, fontWeight: "700" },
+  roleLabelActive: { color: colors.ink },
+  roleHint: { ...type.caption, color: colors.textMuted, fontSize: 10 },
+  roleHintActive: { color: colors.ink, opacity: 0.7 },
+
+  recruit: {
+    marginTop: space.lg,
+    backgroundColor: colors.raised,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radius.md,
+    padding: space.lg,
+    gap: space.sm,
+  },
+  recruitTitle: { ...type.heading, color: colors.text },
+  recruitBody: { ...type.label, color: colors.textSecondary, lineHeight: 19 },
+  recruitButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: space.sm,
+    marginTop: space.xs,
+    backgroundColor: colors.gold,
+    borderRadius: radius.pill,
+    paddingVertical: space.md,
+  },
+  recruitButtonText: { ...type.label, color: colors.ink, fontWeight: "700" },
+
   link: { alignItems: "center", paddingVertical: space.md },
   linkText: { ...type.label, color: colors.gold },
 })
