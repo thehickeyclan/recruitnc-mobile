@@ -15,34 +15,41 @@ import { router, useLocalSearchParams } from "expo-router"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import * as WebBrowser from "expo-web-browser"
 import { colors, radius, space, type } from "@/theme/tokens"
-import { sendPasswordReset, signIn, signUp } from "@/lib/auth"
+import { sendPasswordReset, signIn, signUp, type ProfileType } from "@/lib/auth"
 
 type Mode = "signin" | "signup"
-
-type Role = "parent" | "athlete" | "fan"
 
 const WEB = process.env.EXPO_PUBLIC_WEB_BASE_URL
 
 /**
- * Who is signing up.
+ * Who is signing up — the same six the website offers, in the same order.
  *
  * The app used to send "parent" for everybody, which made the role column meaningless and — worse
  * — silently required a phone number, because the signup API demands one for parent and athlete
  * accounts. The form called that field optional, so anyone who left it blank was rejected by a
  * rule the screen never mentioned.
  */
-const ROLES: { value: Role; label: string; hint: string }[] = [
-  { value: "parent", label: "Parent", hint: "Registering a wrestler" },
+const ROLES: { value: ProfileType; label: string; hint: string }[] = [
   { value: "athlete", label: "Wrestler", hint: "Signing up for myself" },
+  { value: "parent", label: "Parent", hint: "Registering a wrestler" },
+  { value: "college-coach", label: "College coach", hint: "Recruiting athletes" },
+  { value: "hs-club-coach", label: "HS or club coach", hint: "Coaching a team" },
+  { value: "referee", label: "Referee", hint: "Officiating matches" },
   { value: "fan", label: "Fan", hint: "Following the sport" },
 ]
 
 /** Parent and athlete accounts need a reachable number; the signup API rejects them without one. */
-function roleNeedsPhone(role: Role | null): boolean {
+function roleNeedsPhone(role: ProfileType | null): boolean {
   return role === "parent" || role === "athlete"
 }
 
-function RolePicker({ value, onChange }: { value: Role | null; onChange: (r: Role) => void }) {
+function RolePicker({
+  value,
+  onChange,
+}: {
+  value: ProfileType | null
+  onChange: (r: ProfileType) => void
+}) {
   return (
     <View style={styles.field}>
       <Text style={styles.label}>I AM A</Text>
@@ -113,9 +120,9 @@ export default function SignInScreen() {
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
   const [cellPhone, setCellPhone] = useState("")
-  const [role, setRole] = useState<Role | null>(null)
-  /** Set after an athlete signs up, so the recruiting-profile prompt survives the flip to sign-in. */
-  const [athleteJustSignedUp, setAthleteJustSignedUp] = useState(false)
+  const [role, setRole] = useState<ProfileType | null>(null)
+  /** Set after signup, so the role-specific follow-up survives the flip back to sign-in. */
+  const [signedUpAs, setSignedUpAs] = useState<ProfileType | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -129,7 +136,7 @@ export default function SignInScreen() {
         await signIn(email, password)
         router.back()
       } else {
-        if (!role) throw new Error("Tell us whether you are a parent, a wrestler or a fan.")
+        if (!role) throw new Error("Choose which of these you are so we set your account up right.")
         if (!firstName.trim() || !lastName.trim()) throw new Error("Enter your first and last name.")
         // Checked here as well as on the server so the message names the field the form shows,
         // rather than the API's wording about account types the user never chose.
@@ -144,7 +151,7 @@ export default function SignInScreen() {
           cellPhone: cellPhone.trim() || undefined,
           profileType: role,
         })
-        setAthleteJustSignedUp(role === "athlete")
+        setSignedUpAs(role)
         setNotice("Account created. Check your email for the verification link, then sign in.")
         setMode("signin")
       }
@@ -222,7 +229,7 @@ export default function SignInScreen() {
           {/* A wrestler who signs up and stops there is invisible to the coaches searching this
               site, which is the whole reason they signed up. The prompt is deliberately shown
               after the account exists rather than as another step before it. */}
-          {athleteJustSignedUp ? (
+          {signedUpAs === "athlete" ? (
             <View style={styles.recruit}>
               <Text style={styles.recruitTitle}>Get in front of college coaches</Text>
               <Text style={styles.recruitBody}>
@@ -243,6 +250,19 @@ export default function SignInScreen() {
                 <Ionicons name="person-add-outline" size={16} color={colors.ink} />
                 <Text style={styles.recruitButtonText}>Build my recruiting profile</Text>
               </Pressable>
+            </View>
+          ) : null}
+
+          {/* A college coach's account is only half-open until an admin approves it. Saying so
+              here stops the first question being "why can't I see contact details?" */}
+          {signedUpAs === "college-coach" ? (
+            <View style={styles.recruit}>
+              <Text style={styles.recruitTitle}>Welcome, coach</Text>
+              <Text style={styles.recruitBody}>
+                Verify your email and you can browse rankings and profiles straight away. GPA, test
+                scores and athlete contact details unlock once we have approved your account — we
+                check these by hand, so it is usually within the hour.
+              </Text>
             </View>
           ) : null}
 
@@ -312,9 +332,11 @@ const styles = StyleSheet.create({
   },
   disabled: { opacity: 0.6 },
   submitText: { ...type.heading, color: colors.ink },
-  roleRow: { flexDirection: "row", gap: space.sm },
+  roleRow: { flexDirection: "row", flexWrap: "wrap", gap: space.sm },
   role: {
-    flex: 1,
+    // Two per row, sized so the six options stay one tidy grid rather than six stacked cards.
+    width: "48%",
+    flexGrow: 1,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.line,

@@ -4,6 +4,21 @@ import { supabase } from "./supabase"
 
 const BASE = process.env.EXPO_PUBLIC_WEB_BASE_URL
 
+/**
+ * The same six values the web signup offers, spelled identically.
+ *
+ * "college-coach" in particular has to match: the approval flow that unlocks athlete GPA and
+ * contact details keys off that exact string, so a coach who signed up in the app with any other
+ * spelling would sit unapproved forever.
+ */
+export type ProfileType =
+  | "athlete"
+  | "parent"
+  | "college-coach"
+  | "hs-club-coach"
+  | "referee"
+  | "fan"
+
 export type Profile = {
   firstName: string | null
   lastName: string | null
@@ -52,7 +67,7 @@ export async function signUp(input: {
   firstName: string
   lastName: string
   cellPhone?: string
-  profileType: "parent" | "athlete" | "fan"
+  profileType: ProfileType
 }): Promise<{ needsVerification: boolean }> {
   const response = await fetch(`${BASE}/api/auth/signup`, {
     method: "POST",
