@@ -38,6 +38,16 @@ const ROLES: { value: ProfileType; label: string; hint: string }[] = [
   { value: "fan", label: "Fan", hint: "Following the sport" },
 ]
 
+/**
+ * Mirrors the server's auto-approval rule (lib/coach-auto-approve.ts in the web repo): a college
+ * coach on a .edu address is approved on the spot. Only used to pick which sentence to show — the
+ * server decides, this just avoids telling an already-approved coach to sit and wait.
+ */
+function isEduAddress(email: string): boolean {
+  const domain = email.trim().toLowerCase().split("@").pop() ?? ""
+  return /^[a-z0-9-]+(\.[a-z0-9-]+)*\.edu$/.test(domain)
+}
+
 /** Parent and athlete accounts need a reachable number; the signup API rejects them without one. */
 function roleNeedsPhone(role: ProfileType | null): boolean {
   return role === "parent" || role === "athlete"
@@ -259,9 +269,9 @@ export default function SignInScreen() {
             <View style={styles.recruit}>
               <Text style={styles.recruitTitle}>Welcome, coach</Text>
               <Text style={styles.recruitBody}>
-                Verify your email and you can browse rankings and profiles straight away. GPA, test
-                scores and athlete contact details unlock once we have approved your account — we
-                check these by hand, so it is usually within the hour.
+                {isEduAddress(email)
+                  ? "Your .edu address approved you automatically. Verify your email, sign in, and you will have rankings, profiles, GPA, test scores and athlete contact details straight away."
+                  : "Verify your email and you can browse rankings and profiles straight away. GPA, test scores and athlete contact details unlock once we have approved your account — we check these by hand, so it is usually within the hour."}
               </Text>
             </View>
           ) : null}
