@@ -21,11 +21,22 @@ export default function TabsLayout() {
         sceneStyle: { backgroundColor: colors.ink },
       }}
     >
+      {/* The TOC hub IS the index route, not merely the first tab declared: expo-router maps the
+          group's root to index.tsx whatever the declaration order, so listing it first was not
+          enough — the app still opened on commitments. The campaign tells people to download this
+          to see the field and build a bracket; that has to be the screen they land on. */}
       <Tabs.Screen
         name="index"
         options={{
-          title: "Commits",
+          title: "TOC",
           tabBarIcon: ({ color, size }) => <Ionicons name="trophy" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="commits"
+        options={{
+          title: "Commits",
+          tabBarIcon: ({ color, size }) => <Ionicons name="school" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
