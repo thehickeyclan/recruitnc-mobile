@@ -233,7 +233,30 @@ export default function TocBracketScreen() {
     for (const bout of simulated?.bouts ?? []) out[bout.boutNumber] = bout.winnerAthleteId
     return out
   }, [simulated])
-  /** Who is in each bout once the picks are applied — the layout alone never changes. */
+  /**
+   * What the server drew, by bout number.
+   *
+   * The server collapses walkovers — a nine-man weight is mostly byes, and it resolves the feeders
+   * that point at them. Those labels are better than anything reconstructed here from the raw
+   * draw, which still holds all twenty-eight bouts including the ones nobody wrestles.
+   */
+  const layoutSlots = useMemo(() => {
+    const out: Record<number, { top: BracketSlotDisplay; bottom: BracketSlotDisplay }> = {}
+    for (const side of [preview?.layout.championship, preview?.layout.consolation]) {
+      for (const match of side?.matches ?? []) {
+        if (match.boutNumber != null) out[match.boutNumber] = { top: match.top, bottom: match.bottom }
+      }
+    }
+    return out
+  }, [preview])
+
+  /**
+   * Who is in each bout once the picks are applied — the layout alone never changes.
+   *
+   * Only a slot the simulation has resolved to an actual wrestler overrides the server. Left to
+   * override everything, it reinstated feeders the server had already collapsed: bout 21 read
+   * "Winner Bout 16" when bout 16 is a walkover nobody wrestles.
+   */
   const resolvedByBout = useMemo(() => {
     const out: Record<number, { top: any; bottom: any }> = {}
     for (const bout of simulated?.bouts ?? []) {
@@ -245,10 +268,15 @@ export default function TocBracketScreen() {
         photoUrl: null,
         competitorId: slot.kind === "athlete" ? slot.athleteId : null,
       })
-      out[bout.boutNumber] = { top: asDisplay(bout.top), bottom: asDisplay(bout.bottom) }
+      const drawn = layoutSlots[bout.boutNumber]
+      out[bout.boutNumber] = {
+        top: bout.top.kind === "athlete" ? asDisplay(bout.top) : drawn?.top ?? asDisplay(bout.top),
+        bottom:
+          bout.bottom.kind === "athlete" ? asDisplay(bout.bottom) : drawn?.bottom ?? asDisplay(bout.bottom),
+      }
     }
     return out
-  }, [simulated])
+  }, [simulated, layoutSlots])
 
   const progress = simulated ? pickProgress(simulated, picks) : { picked: 0, total: 0 }
   const champion = simulated ? championOf(simulated, picks) : null
