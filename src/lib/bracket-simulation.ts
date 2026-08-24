@@ -48,9 +48,12 @@ function resolveSlotAthleteId(
    * wrestler resolved at every round and each one read as a walkover.
    */
   if (sourceAthletes.length === 1) {
+    // Structurally empty means a slot that can never hold a wrestler: a bye, or an open seed
+    // held as a placeholder athlete. A feeder is different — it will hold somebody, later.
+    const neverFills = (s: BracketSlot) =>
+      s.kind === "empty" || (s.kind === "athlete" && isPlaceholder(draw, s.athleteId))
     const missingSideIsEmpty =
-      (topId == null && source.top.kind === "empty") ||
-      (bottomId == null && source.bottom.kind === "empty")
+      (topId == null && neverFills(source.top)) || (bottomId == null && neverFills(source.bottom))
     if (!missingSideIsEmpty) return null
     return /^loser\b/i.test(slot.label) ? null : sourceAthletes[0]
   }
