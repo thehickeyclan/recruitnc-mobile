@@ -32,17 +32,26 @@ function resolveSlotAthleteId(
   const source = draw.bouts.find((bout) => bout.boutNumber === slot.boutNumber)
   if (!source || resolving.has(source.boutNumber)) return null
 
-  const sourceAthletes = boutParticipants(
-    draw,
-    picks,
-    source.boutNumber,
-    new Set(resolving).add(source.boutNumber),
-  )
+  const nested = new Set(resolving).add(source.boutNumber)
+  const topId = resolveSlotAthleteId(draw, picks, source.top, nested)
+  const bottomId = resolveSlotAthleteId(draw, picks, source.bottom, nested)
+  const sourceAthletes = [topId, bottomId].filter((id): id is string => Boolean(id))
   const winner = picks[source.boutNumber]
 
-  // A bout with one real wrestler is a bye: they advance on the championship side, and there
-  // is no loser to drop to consolation.
+  /**
+   * A bout with one wrestler is a bye only when the other side is structurally empty. If the
+   * other side is a feeder that has not been decided yet, nobody has advanced — they are simply
+   * waiting.
+   *
+   * Without that distinction the top seed walked to the final on their own: their quarterfinal
+   * opponent is the pigtail winner, which is undecided until someone picks it, so exactly one
+   * wrestler resolved at every round and each one read as a walkover.
+   */
   if (sourceAthletes.length === 1) {
+    const missingSideIsEmpty =
+      (topId == null && source.top.kind === "empty") ||
+      (bottomId == null && source.bottom.kind === "empty")
+    if (!missingSideIsEmpty) return null
     return /^loser\b/i.test(slot.label) ? null : sourceAthletes[0]
   }
   if (!winner || !sourceAthletes.includes(winner)) return null
