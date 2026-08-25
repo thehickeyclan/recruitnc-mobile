@@ -139,7 +139,7 @@ export default function RankingsScreen() {
           <Ionicons name="lock-closed" size={34} color={colors.line} />
           <Text style={styles.gateTitle}>Sign in for RecruitNC rankings</Text>
           <Text style={styles.gateBody}>
-            Rankings are an account feature so we can protect the work and personalise your view.
+            Rankings are an account feature so we can protect the work and personalize your view.
             Commitments, the calendar and Data Dawg stay open to everyone.
           </Text>
           <Pressable
