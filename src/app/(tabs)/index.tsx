@@ -1,25 +1,25 @@
 import { useEffect, useState } from "react"
-import { Image, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native"
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { router } from "expo-router"
 import * as WebBrowser from "expo-web-browser"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors, radius, space, type } from "@/theme/tokens"
 import { fetchTocField, type TocField } from "@/lib/toc-field"
-import { useAlertPrefs } from "@/lib/alert-prefs"
-import { TocMadness } from "@/components/toc-madness"
+import { fetchCommits, type Commit } from "@/lib/commits"
+import { fetchUpcomingEvents, formatTime, type CalendarEvent } from "@/lib/events"
+import { TocMadnessCard } from "@/components/toc-madness-card"
 
 /**
- * The Tournament of Champions hub — the first thing the app opens to.
+ * Home — what is happening right now, in the order it matters.
  *
- * People download this app because we told them to, to see the field and build a bracket. Landing
- * them on college commitments and asking them to find the tournament under "More" loses exactly
- * the person the campaign just paid for. Everything TOC lives behind this one tab: the field,
- * their bracket, tickets, and the alert that tells them a weight class dropped.
+ * The app used to open on the Tournament of Champions itself, which reads oddly for anyone who
+ * came for recruiting and lands inside a bracket, and reads worse the day after the tournament
+ * ends. So the tournament is the top card here instead: loudest thing on the screen while it is
+ * live, gone in September, with a home page still underneath it.
  */
 
 const WEB = process.env.EXPO_PUBLIC_WEB_BASE_URL
-const TOC_WEB = `${WEB}/tournament-of-champions`
 
 function openWeb(url: string) {
   void WebBrowser.openBrowserAsync(url, {
@@ -30,125 +30,159 @@ function openWeb(url: string) {
   }).catch(() => undefined)
 }
 
-function Row({
-  icon,
-  title,
-  detail,
-  onPress,
-  accent,
-}: {
-  icon: keyof typeof Ionicons.glyphMap
-  title: string
-  detail: string
-  onPress: () => void
-  accent?: boolean
-}) {
+/** "2026-09-18" → "18 Sep" */
+function shortDate(iso: string): string {
+  const [year, month, day] = iso.split("-").map(Number)
+  const date = new Date(year, month - 1, day)
+  return date.toLocaleDateString("en-US", { day: "numeric", month: "short" })
+}
+
+function SectionHeader({ title, action, onPress }: { title: string; action: string; onPress: () => void }) {
   return (
-    <Pressable style={[styles.row, accent && styles.rowAccent]} onPress={onPress}>
-      <View style={[styles.rowIcon, accent && styles.rowIconAccent]}>
-        <Ionicons name={icon} size={18} color={accent ? colors.ink : colors.gold} />
-      </View>
+    <View style={styles.sectionHead}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      <Pressable onPress={onPress} hitSlop={8}>
+        <Text style={styles.sectionAction}>{action}</Text>
+      </Pressable>
+    </View>
+  )
+}
+
+function CommitRow({ commit }: { commit: Commit }) {
+  return (
+    <Pressable style={styles.row} onPress={() => router.push("/commits")}>
+      {commit.collegeLogoUrl ? (
+        <Image source={{ uri: commit.collegeLogoUrl }} style={styles.logo} resizeMode="contain" />
+      ) : (
+        <View style={[styles.logo, styles.logoEmpty]}>
+          <Ionicons name="school" size={16} color={colors.textMuted} />
+        </View>
+      )}
       <View style={styles.flex}>
-        <Text style={[styles.rowTitle, accent && styles.rowTitleAccent]}>{title}</Text>
-        <Text style={[styles.rowDetail, accent && styles.rowDetailAccent]}>{detail}</Text>
+        <Text style={styles.rowTitle} numberOfLines={1}>
+          {commit.name}
+        </Text>
+        <Text style={styles.rowDetail} numberOfLines={1}>
+          {commit.college}
+          {commit.weightclass ? ` · ${commit.weightclass}` : ""}
+        </Text>
       </View>
-      <Ionicons name="chevron-forward" size={18} color={accent ? colors.ink : colors.textMuted} />
     </Pressable>
   )
 }
 
-export default function TocScreen() {
+function EventRow({ event }: { event: CalendarEvent }) {
+  const time = formatTime(event.startTime)
+  return (
+    <Pressable style={styles.row} onPress={() => router.push("/calendar")}>
+      <View style={[styles.date, { borderColor: event.accent }]}>
+        <Text style={styles.dateText}>{shortDate(event.startDate)}</Text>
+      </View>
+      <View style={styles.flex}>
+        <Text style={styles.rowTitle} numberOfLines={1}>
+          {event.title}
+        </Text>
+        <Text style={styles.rowDetail} numberOfLines={1}>
+          {[event.categoryLabel, time, event.location].filter(Boolean).join(" · ")}
+        </Text>
+      </View>
+    </Pressable>
+  )
+}
+
+export default function HomeScreen() {
   const [field, setField] = useState<TocField | null>(null)
-  const { prefs, enabled, busy, notice, enable, toggle } = useAlertPrefs()
+  const [commits, setCommits] = useState<Commit[]>([])
+  const [events, setEvents] = useState<CalendarEvent[]>([])
 
   useEffect(() => {
-    void fetchTocField()
-      .then(setField)
-      .catch(() => undefined)
+    // Each section fills in on its own. One slow call should not hold up the rest of the page.
+    void fetchTocField().then(setField).catch(() => undefined)
+    void fetchCommits(3).then((r) => setCommits(r.commits.slice(0, 3))).catch(() => undefined)
+    void fetchUpcomingEvents().then((r) => setEvents(r.slice(0, 3))).catch(() => undefined)
   }, [])
 
   const announced = field?.tiles.filter((t) => t.announced).length ?? 0
   const total = field?.tiles.length ?? 0
-  const fieldDetail =
-    total > 0
-      ? announced === total
-        ? "Every weight class announced"
-        : `${announced} of ${total} weight classes announced`
-      : "Announced wrestlers, weight by weight"
 
   return (
     <SafeAreaView style={styles.screen} edges={["top"]}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.head}>
           <Image
-            source={require("../../../assets/images/toc-logo.png")}
-            style={styles.logo}
+            source={require("../../../assets/images/nc-united-logo-white-source.png")}
+            style={styles.brand}
             resizeMode="contain"
           />
           <View style={styles.flex}>
-            <Text style={styles.eyebrow}>SEPTEMBER 18–19, 2026</Text>
-            <Text style={styles.title}>Tournament of Champions</Text>
-            <Text style={styles.subtitle}>Hope Community Church · Apex</Text>
+            <Text style={styles.eyebrow}>NC WRESTLING UNITED</Text>
+            <Text style={styles.title}>North Carolina wrestling, all of it</Text>
           </View>
         </View>
 
-        <TocMadness onStart={() => router.push("/toc-bracket")} />
+        <TocMadnessCard
+          announced={announced}
+          total={total}
+          onOpenToc={() => router.push("/toc")}
+          onStartBracket={() => router.push("/toc-bracket")}
+        />
 
-        <View style={styles.group}>
-          <Row
-            icon="people"
-            title="The Field"
-            detail={fieldDetail}
-            onPress={() => router.push("/toc-field")}
-          />
-          <Row
-            icon="git-branch"
-            title="Your Bracket"
-            detail="Seed it yourself and run the draw"
-            onPress={() => router.push("/toc-bracket")}
-          />
-        </View>
-
-        <Text style={styles.groupLabel}>THE EVENT</Text>
-        <View style={styles.group}>
-          <Row
-            icon="ticket"
-            title="Tickets"
-            detail="Seating is limited — families first"
-            onPress={() => openWeb(TOC_WEB)}
-          />
-          <Row
-            icon="information-circle"
-            title="Schedule, venue and FAQ"
-            detail="Weigh-ins, timing and what to expect"
-            onPress={() => openWeb(TOC_WEB)}
-          />
-        </View>
-
-        <Text style={styles.groupLabel}>ALERTS</Text>
-        <View style={styles.group}>
-          {enabled ? (
-            <View style={styles.toggleRow}>
-              <View style={styles.flex}>
-                <Text style={styles.rowTitle}>Weight class releases</Text>
-                <Text style={styles.rowDetail}>The moment a field goes live</Text>
-              </View>
-              <Switch
-                value={prefs.toc}
-                onValueChange={(v) => void toggle("toc", v)}
-                trackColor={{ true: colors.gold, false: colors.line }}
-                thumbColor={colors.text}
-              />
+        {events.length > 0 ? (
+          <View style={styles.section}>
+            <SectionHeader title="Coming up" action="Calendar" onPress={() => router.push("/calendar")} />
+            <View style={styles.group}>
+              {events.map((event) => (
+                <EventRow key={event.id} event={event} />
+              ))}
             </View>
-          ) : (
-            <Pressable style={styles.enable} onPress={() => void enable()} disabled={busy}>
-              <Ionicons name="notifications" size={16} color={colors.ink} />
-              <Text style={styles.enableText}>
-                {busy ? "Turning on…" : "Know the moment a weight class drops"}
-              </Text>
+          </View>
+        ) : null}
+
+        {commits.length > 0 ? (
+          <View style={styles.section}>
+            <SectionHeader title="Latest commitments" action="All" onPress={() => router.push("/commits")} />
+            <View style={styles.group}>
+              {commits.map((commit) => (
+                <CommitRow key={commit.id} commit={commit} />
+              ))}
+            </View>
+          </View>
+        ) : null}
+
+        <View style={styles.section}>
+          <SectionHeader title="Around the state" action="News" onPress={() => openWeb(`${WEB}/news`)} />
+          <View style={styles.group}>
+            <Pressable style={styles.row} onPress={() => openWeb(`${WEB}/news`)}>
+              <View style={[styles.logo, styles.logoEmpty]}>
+                <Ionicons name="newspaper" size={16} color={colors.gold} />
+              </View>
+              <View style={styles.flex}>
+                <Text style={styles.rowTitle}>United Ascent</Text>
+                <Text style={styles.rowDetail}>The newspaper, and everything else we write</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
             </Pressable>
-          )}
-          {notice ? <Text style={styles.notice}>{notice}</Text> : null}
+            <Pressable style={styles.row} onPress={() => router.push("/rankings")}>
+              <View style={[styles.logo, styles.logoEmpty]}>
+                <Ionicons name="podium" size={16} color={colors.gold} />
+              </View>
+              <View style={styles.flex}>
+                <Text style={styles.rowTitle}>Rankings</Text>
+                <Text style={styles.rowDetail}>Where every class stands</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            </Pressable>
+            <Pressable style={styles.row} onPress={() => router.push("/clubs")}>
+              <View style={[styles.logo, styles.logoEmpty]}>
+                <Ionicons name="location" size={16} color={colors.gold} />
+              </View>
+              <View style={styles.flex}>
+                <Text style={styles.rowTitle}>Find a club</Text>
+                <Text style={styles.rowDetail}>Every club in North Carolina, on a map</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            </Pressable>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -157,16 +191,19 @@ export default function TocScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.ink },
-  content: { padding: space.lg, paddingBottom: space.xxl * 2, gap: space.md },
+  content: { padding: space.lg, paddingBottom: space.xxl * 3, gap: space.md },
   flex: { flex: 1 },
 
-  head: { flexDirection: "row", alignItems: "center", gap: space.md, marginBottom: space.sm },
-  logo: { width: 64, height: 64 },
+  head: { flexDirection: "row", alignItems: "center", gap: space.md },
+  brand: { width: 44, height: 44 },
   eyebrow: { ...type.caption, color: colors.gold },
-  title: { ...type.heading, color: colors.text, marginTop: 2 },
-  subtitle: { ...type.label, color: colors.textMuted, marginTop: 2 },
+  title: { ...type.title, color: colors.text, marginTop: 2 },
 
-  groupLabel: { ...type.caption, color: colors.textMuted, marginTop: space.md },
+  section: { gap: space.sm },
+  sectionHead: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" },
+  sectionTitle: { ...type.heading, color: colors.text },
+  sectionAction: { ...type.label, color: colors.gold },
+
   group: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -174,7 +211,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     overflow: "hidden",
   },
-
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -183,30 +219,20 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.line,
   },
-  rowAccent: { backgroundColor: colors.gold, borderBottomWidth: 0 },
-  rowIcon: {
+  rowTitle: { ...type.label, color: colors.text, fontWeight: "700" },
+  rowDetail: { ...type.caption, color: colors.textMuted, marginTop: 2, fontWeight: "600", letterSpacing: 0.2 },
+
+  logo: { width: 34, height: 34, borderRadius: radius.sm },
+  logoEmpty: { backgroundColor: colors.raised, alignItems: "center", justifyContent: "center" },
+
+  date: {
     width: 34,
     height: 34,
     borderRadius: radius.sm,
+    borderLeftWidth: 3,
     backgroundColor: colors.raised,
     alignItems: "center",
     justifyContent: "center",
   },
-  rowIconAccent: { backgroundColor: "rgba(10, 22, 40, 0.12)" },
-  rowTitle: { ...type.label, color: colors.text, fontWeight: "700" },
-  rowTitleAccent: { color: colors.ink },
-  rowDetail: { ...type.caption, color: colors.textMuted, marginTop: 2 },
-  rowDetailAccent: { color: colors.ink, opacity: 0.75 },
-
-  toggleRow: { flexDirection: "row", alignItems: "center", gap: space.md, padding: space.md },
-  enable: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: space.sm,
-    backgroundColor: colors.gold,
-    padding: space.md,
-  },
-  enableText: { ...type.label, color: colors.ink, fontWeight: "700" },
-  notice: { ...type.caption, color: colors.textSecondary, padding: space.md, paddingTop: 0 },
+  dateText: { fontSize: 10, fontWeight: "800", color: colors.text, textAlign: "center" },
 })

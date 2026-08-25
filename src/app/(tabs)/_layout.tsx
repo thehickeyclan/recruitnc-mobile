@@ -21,15 +21,15 @@ export default function TabsLayout() {
         sceneStyle: { backgroundColor: colors.ink },
       }}
     >
-      {/* The TOC hub IS the index route, not merely the first tab declared: expo-router maps the
-          group's root to index.tsx whatever the declaration order, so listing it first was not
-          enough — the app still opened on commitments. The campaign tells people to download this
-          to see the field and build a bracket; that has to be the screen they land on. */}
+      {/* Home is the index route, and expo-router maps the group's root to index.tsx whatever the
+          declaration order — so this file is the landing screen by virtue of its name, not its
+          position here. The tournament rides as the top card on Home rather than owning a tab:
+          loudest thing in the app until 19 September, and nothing at all after it. */}
       <Tabs.Screen
         name="index"
         options={{
-          title: "TOC",
-          tabBarIcon: ({ color, size }) => <Ionicons name="trophy" size={size} color={color} />,
+          title: "Home",
+          tabBarIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
