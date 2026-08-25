@@ -128,3 +128,38 @@ describe("placeholders", () => {
     expect(boutParticipants(bye, {}, 4)).toEqual([])
   })
 })
+
+/**
+ * The shape a nine-man weight makes around the pigtail. Bout 1 is the top seed with a bye, so it
+ * has no loser at all; bout 16 pairs that absent loser with the pigtail loser and passes him
+ * through; bout 21 is where he should turn up.
+ */
+const nineMan: BracketDraw = {
+  weightClass: 133,
+  format: "8-man-de",
+  participants: [
+    { athleteId: "s1", seed: 1, name: "Top", school: null, photoUrl: null, graduationYear: null },
+    { athleteId: "s8", seed: 8, name: "Mathon", school: null, photoUrl: null, graduationYear: null },
+    { athleteId: "s9", seed: 9, name: "Cross", school: null, photoUrl: null, graduationYear: null },
+  ],
+  bouts: [
+    { id: "1", boutNumber: 1, roundLabel: "Preliminary", side: "winners", top: { kind: "athlete", athleteId: "s1" }, bottom: { kind: "empty" }, winnerAthleteId: null, status: "scheduled" },
+    { id: "2", boutNumber: 2, roundLabel: "Preliminary", side: "winners", top: { kind: "athlete", athleteId: "s9" }, bottom: { kind: "athlete", athleteId: "s8" }, winnerAthleteId: null, status: "scheduled" },
+    { id: "16", boutNumber: 16, roundLabel: "Consolation R1", side: "losers", top: { kind: "feeder", boutNumber: 1, label: "Loser Bout 1" }, bottom: { kind: "feeder", boutNumber: 2, label: "Loser Bout 2" }, winnerAthleteId: null, status: "scheduled" },
+    { id: "21", boutNumber: 21, roundLabel: "Consolation R2", side: "losers", top: { kind: "feeder", boutNumber: 12, label: "Loser Bout 12" }, bottom: { kind: "feeder", boutNumber: 16, label: "Winner Bout 16" }, winnerAthleteId: null, status: "scheduled" },
+  ],
+}
+
+describe("nine-man consolation", () => {
+  it("drops the pigtail loser into consolation as soon as the pigtail is picked", () => {
+    expect(boutParticipants(nineMan, { 2: "s8" }, 21)).toContain("s9")
+  })
+
+  it("keeps the pigtail winner out of consolation", () => {
+    expect(boutParticipants(nineMan, { 2: "s8" }, 21)).not.toContain("s8")
+  })
+
+  it("leaves consolation empty until the pigtail is picked", () => {
+    expect(boutParticipants(nineMan, {}, 21)).toEqual([])
+  })
+})

@@ -20,6 +20,30 @@ function realAthleteId(draw: BracketDraw, slot: BracketSlot): string | null {
   return isPlaceholder(draw, slot.athleteId) ? null : slot.athleteId
 }
 
+/**
+ * Could this slot ever hold a wrestler?
+ *
+ * The question a bye rule actually needs to ask. A bye and an unfilled seed never can. A feeder
+ * usually can — but not always, and that is the case worth spelling out: "Loser Bout 1" can never
+ * be filled when bout 1 is a walkover, because a walkover has no loser. That absence cascades, so
+ * this has to recurse rather than look at the slot in front of it.
+ *
+ * At a nine-man weight it decides whether the pigtail loser reaches consolation at all.
+ */
+function mayEverFill(draw: BracketDraw, slot: BracketSlot, seen = new Set<number>()): boolean {
+  if (slot.kind === "athlete") return realAthleteId(draw, slot) != null
+  if (slot.kind === "empty") return false
+
+  const source = draw.bouts.find((bout) => bout.boutNumber === slot.boutNumber)
+  if (!source || seen.has(source.boutNumber)) return false
+
+  const next = new Set(seen).add(source.boutNumber)
+  const fillable = [source.top, source.bottom].filter((side) => mayEverFill(draw, side, next)).length
+
+  // A winner needs one wrestler to show up; a loser needs the bout to actually be wrestled.
+  return /^loser\b/i.test(slot.label) ? fillable >= 2 : fillable >= 1
+}
+
 function resolveSlotAthleteId(
   draw: BracketDraw,
   picks: SimulationPicks,
@@ -48,12 +72,9 @@ function resolveSlotAthleteId(
    * wrestler resolved at every round and each one read as a walkover.
    */
   if (sourceAthletes.length === 1) {
-    // Structurally empty means a slot that can never hold a wrestler: a bye, or an open seed
-    // held as a placeholder athlete. A feeder is different — it will hold somebody, later.
-    const neverFills = (s: BracketSlot) =>
-      s.kind === "empty" || (s.kind === "athlete" && isPlaceholder(draw, s.athleteId))
     const missingSideIsEmpty =
-      (topId == null && neverFills(source.top)) || (bottomId == null && neverFills(source.bottom))
+      (topId == null && !mayEverFill(draw, source.top)) ||
+      (bottomId == null && !mayEverFill(draw, source.bottom))
     if (!missingSideIsEmpty) return null
     return /^loser\b/i.test(slot.label) ? null : sourceAthletes[0]
   }
