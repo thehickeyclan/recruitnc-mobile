@@ -268,11 +268,18 @@ export default function TocBracketScreen() {
         photoUrl: null,
         competitorId: slot.kind === "athlete" ? slot.athleteId : null,
       })
+      // Use the simulation whenever it has worked out an actual wrestler — including through a
+      // feeder, which is how "Loser Bout 2" becomes the wrestler who just lost the pigtail. Only
+      // fall back to the server's slot when the simulation has nobody, so collapsed walkovers stay
+      // collapsed without also discarding the results of a pick.
       const drawn = layoutSlots[bout.boutNumber]
+      const pick = (slot: (typeof bout)["top"], fallback: BracketSlotDisplay | undefined) => {
+        const resolved = asDisplay(slot)
+        return resolved.competitorId ? resolved : fallback ?? resolved
+      }
       out[bout.boutNumber] = {
-        top: bout.top.kind === "athlete" ? asDisplay(bout.top) : drawn?.top ?? asDisplay(bout.top),
-        bottom:
-          bout.bottom.kind === "athlete" ? asDisplay(bout.bottom) : drawn?.bottom ?? asDisplay(bout.bottom),
+        top: pick(bout.top, drawn?.top),
+        bottom: pick(bout.bottom, drawn?.bottom),
       }
     }
     return out
