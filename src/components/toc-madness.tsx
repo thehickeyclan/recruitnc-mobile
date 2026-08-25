@@ -42,7 +42,7 @@ function Step({
   )
 }
 
-export function TocMadness({ onStart, onRules }: { onStart: () => void; onRules: () => void }) {
+export function TocMadness({ onStart }: { onStart: () => void }) {
   const days = daysUntil(SEEDS_ANNOUNCED)
   const seedsOut = days <= 0
 
@@ -67,24 +67,13 @@ export function TocMadness({ onStart, onRules }: { onStart: () => void; onRules:
           detail="Once the official seeds are announced, submit a bracket at each weight, then score points as the tournament runs and watch the leaderboard."
           live={seedsOut}
         />
-        <Step
-          number="3"
-          when="TO BE PRIZE ELIGIBLE"
-          title="Favorite five in the Guild app"
-          detail="Grab The Wrestling Guild app, make a free account and heart your five favorite marketplace items — so your credit is ready to spend the moment you win."
-        />
       </View>
 
       <Pressable style={styles.cta} onPress={onStart}>
         <Ionicons name="git-branch" size={16} color={colors.ink} />
         <Text style={styles.ctaText}>{seedsOut ? "Submit your bracket" : "Start your bracket"}</Text>
       </Pressable>
-      <Text style={styles.fine}>
-        Top finishers win Guild Market credit. One entry per weight, per account.
-      </Text>
-      <Pressable onPress={onRules} hitSlop={8}>
-        <Text style={styles.rules}>Official rules</Text>
-      </Pressable>
+      <Text style={styles.fine}>One entry per weight, per account.</Text>
     </View>
   )
 }
@@ -139,12 +128,5 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     letterSpacing: 0.2,
     lineHeight: 16,
-  },
-  rules: {
-    ...type.caption,
-    color: colors.textSecondary,
-    textAlign: "center",
-    fontWeight: "700",
-    textDecorationLine: "underline",
   },
 })

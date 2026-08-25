@@ -20,7 +20,6 @@ import { TocMadness } from "@/components/toc-madness"
 
 const WEB = process.env.EXPO_PUBLIC_WEB_BASE_URL
 const TOC_WEB = `${WEB}/tournament-of-champions`
-const MADNESS_RULES = `${WEB}/tournament-of-champions/toc-madness-rules`
 
 function openWeb(url: string) {
   void WebBrowser.openBrowserAsync(url, {
@@ -93,10 +92,7 @@ export default function TocScreen() {
           </View>
         </View>
 
-        <TocMadness
-          onStart={() => router.push("/toc-bracket")}
-          onRules={() => openWeb(MADNESS_RULES)}
-        />
+        <TocMadness onStart={() => router.push("/toc-bracket")} />
 
         <View style={styles.group}>
           <Row
