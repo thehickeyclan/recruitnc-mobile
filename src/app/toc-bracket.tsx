@@ -6,7 +6,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage"
 import { router, useLocalSearchParams } from "expo-router"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors, radius, space, type } from "@/theme/tokens"
-import { fetchTocField, type TocField, type TocFieldAthlete } from "@/lib/toc-field"
+import { compareBySurname, fetchTocField, type TocField, type TocFieldAthlete } from "@/lib/toc-field"
 import {
   buildBracketPreview,
   slotLabel,
@@ -25,27 +25,15 @@ type Orders = Record<string, string[]>
 type AllPicks = Record<string, SimulationPicks>
 
 /**
- * Credential strength, strongest first. Used only to give someone a sensible starting order so
- * they are not ranking eight strangers from an alphabetical list.
+ * Alphabetical by surname — the same order the field is published in.
  *
- * Derived purely from what the public field already shows. The official seeding lives on the
- * private field board and must not be inferable here — see public-announced-field.ts.
+ * This list used to open in credential order, strongest first, as a convenience so nobody had to
+ * rank eight strangers. But an ordered list of a weight class, published by the people running
+ * the tournament, reads as a suggested seeding whatever the label above it says. Alphabetical
+ * takes no view, and matches what The Field shows.
  */
-const CREDENTIAL_RANK: Record<string, number> = {
-  "all-american": 0,
-  "state-champion": 1,
-  "state-placer": 2,
-  "state-qualifier": 3,
-}
-
 function defaultOrder(athletes: TocFieldAthlete[]): string[] {
-  return [...athletes]
-    .sort((a, b) => {
-      const ra = CREDENTIAL_RANK[a.credentials[0]?.kind ?? ""] ?? 9
-      const rb = CREDENTIAL_RANK[b.credentials[0]?.kind ?? ""] ?? 9
-      return ra !== rb ? ra - rb : a.name.localeCompare(b.name)
-    })
-    .map((a) => a.athleteId)
+  return [...athletes].sort(compareBySurname).map((a) => a.athleteId)
 }
 
 /**

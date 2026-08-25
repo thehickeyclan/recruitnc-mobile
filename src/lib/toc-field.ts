@@ -70,3 +70,24 @@ export async function fetchTocField(signal?: AbortSignal): Promise<TocField> {
 export function headlineCredential(athlete: TocFieldAthlete): TocCredential | null {
   return athlete.credentials[0] ?? null
 }
+
+/** Name suffixes that are not the family name. */
+const NAME_SUFFIXES = new Set(["jr", "jr.", "sr", "sr.", "ii", "iii", "iv", "v"])
+
+/**
+ * Sort key for a wrestler's family name — "Kristopher Kerr Jr" sorts under K, not J.
+ *
+ * The field is published alphabetically by surname, and anywhere else we list a weight it should
+ * match, or the same eight names appear in two different orders in the same app.
+ */
+export function surnameKey(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean)
+  while (parts.length > 1 && NAME_SUFFIXES.has(parts[parts.length - 1].toLowerCase())) parts.pop()
+  return (parts[parts.length - 1] ?? fullName).toLowerCase()
+}
+
+/** Alphabetical by surname, then by full name so identical surnames stay stable. */
+export function compareBySurname(a: { name: string }, b: { name: string }): number {
+  const keyed = surnameKey(a.name).localeCompare(surnameKey(b.name))
+  return keyed !== 0 ? keyed : a.name.localeCompare(b.name)
+}
