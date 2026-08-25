@@ -7,6 +7,7 @@ import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors, radius, space, type } from "@/theme/tokens"
 import { fetchTocField, type TocField } from "@/lib/toc-field"
 import { useAlertPrefs } from "@/lib/alert-prefs"
+import { TocMadness } from "@/components/toc-madness"
 
 /**
  * The Tournament of Champions hub — the first thing the app opens to.
@@ -91,6 +92,8 @@ export default function TocScreen() {
           </View>
         </View>
 
+        <TocMadness onStart={() => router.push("/toc-bracket")} />
+
         <View style={styles.group}>
           <Row
             icon="people"
@@ -102,7 +105,6 @@ export default function TocScreen() {
             icon="git-branch"
             title="Your Bracket"
             detail="Seed it yourself and run the draw"
-            accent
             onPress={() => router.push("/toc-bracket")}
           />
         </View>
