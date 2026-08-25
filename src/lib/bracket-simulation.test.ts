@@ -143,7 +143,7 @@ const nineMan: BracketDraw = {
     { athleteId: "s9", seed: 9, name: "Cross", school: null, photoUrl: null, graduationYear: null },
   ],
   bouts: [
-    { id: "1", boutNumber: 1, roundLabel: "Preliminary", side: "winners", top: { kind: "athlete", athleteId: "s1" }, bottom: { kind: "empty" }, winnerAthleteId: null, status: "scheduled" },
+    { id: "1", boutNumber: 1, roundLabel: "Preliminary", side: "winners", top: { kind: "athlete", athleteId: "s1" }, bottom: { kind: "empty", label: "Bye" }, winnerAthleteId: null, status: "scheduled" },
     { id: "2", boutNumber: 2, roundLabel: "Preliminary", side: "winners", top: { kind: "athlete", athleteId: "s9" }, bottom: { kind: "athlete", athleteId: "s8" }, winnerAthleteId: null, status: "scheduled" },
     { id: "16", boutNumber: 16, roundLabel: "Consolation R1", side: "losers", top: { kind: "feeder", boutNumber: 1, label: "Loser Bout 1" }, bottom: { kind: "feeder", boutNumber: 2, label: "Loser Bout 2" }, winnerAthleteId: null, status: "scheduled" },
     { id: "21", boutNumber: 21, roundLabel: "Consolation R2", side: "losers", top: { kind: "feeder", boutNumber: 12, label: "Loser Bout 12" }, bottom: { kind: "feeder", boutNumber: 16, label: "Winner Bout 16" }, winnerAthleteId: null, status: "scheduled" },
