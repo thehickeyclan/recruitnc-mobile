@@ -197,21 +197,33 @@ export default function MoreScreen() {
           </View>
         )}
 
-        <View style={styles.group}>
+        {/* Until alerts are on for the device, these are preferences for something that is not
+            running: nothing is registered and nothing syncs. Showing them bright and switched on
+            above a "Turn on alerts" button reads as "all set", which is how somebody waits for a
+            notification that was never going to arrive. */}
+        <View style={[styles.group, !enabled && styles.groupInactive]}>
           {ALERTS.map((alert, i) => (
-            <View key={alert.key} style={[styles.row, i > 0 && styles.rowDivider]}>
+            <Pressable
+              key={alert.key}
+              style={[styles.row, i > 0 && styles.rowDivider]}
+              disabled={enabled || busy}
+              onPress={() => void enable()}
+            >
               <View style={styles.rowBody}>
                 <Text style={styles.rowTitle}>{alert.title}</Text>
-                <Text style={styles.rowDetail}>{alert.detail}</Text>
+                <Text style={styles.rowDetail}>
+                  {enabled ? alert.detail : "Turn on alerts to get this"}
+                </Text>
               </View>
               <Switch
-                value={prefs[alert.key]}
+                value={enabled && prefs[alert.key]}
+                disabled={!enabled}
                 onValueChange={(v) => void toggle(alert.key, v)}
                 trackColor={{ false: colors.line, true: colors.gold }}
                 thumbColor={colors.text}
                 ios_backgroundColor={colors.line}
               />
-            </View>
+            </Pressable>
           ))}
         </View>
 
@@ -271,6 +283,7 @@ const styles = StyleSheet.create({
     padding: space.md,
   },
   statusText: { ...type.label, color: colors.textSecondary },
+  groupInactive: { opacity: 0.55 },
   group: {
     backgroundColor: colors.raised,
     borderRadius: radius.lg,

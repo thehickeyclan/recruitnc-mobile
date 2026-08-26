@@ -54,9 +54,11 @@ function BracketCard({
   onPickWinner,
   scroll = true,
   cardRef,
+  official = false,
 }: {
   weight: number
   championName: string | null
+  official?: boolean
   layout: BracketPreview["layout"]
   winners: Record<number, string | null>
   resolved: Record<number, { top: BracketSlotDisplay; bottom: BracketSlotDisplay }>
@@ -84,7 +86,7 @@ function BracketCard({
         <View style={styles.flexShrink}>
           <Text style={styles.shareWeight}>{weight} lbs</Text>
           <Text style={styles.shareSub}>
-            {championName ? `${championName} takes it` : "Projected bracket"}
+            {championName ? `${championName} takes it` : official ? "Official bracket" : "Projected bracket"}
           </Text>
         </View>
       </View>
@@ -359,7 +361,9 @@ export default function TocBracketScreen() {
             <ScrollView contentContainerStyle={styles.body}>
               {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-              {seeded.length < athletes.length ? (
+              {/* Seeding is how you build a projection. Once TOC has released the real draw
+                  there is nothing to seed — the bracket is simply the bracket. */}
+              {!preview?.official && seeded.length < athletes.length ? (
                 <>
                   <Text style={styles.instruction}>
                     Tap wrestlers in the order you&apos;d seed them — {seeded.length} of {athletes.length}.
@@ -426,6 +430,7 @@ export default function TocBracketScreen() {
                   <BracketCard
                     weight={preview.weightClass}
                     championName={championName}
+                    official={preview.official}
                     layout={preview.layout}
                     winners={winnersByBout}
                     resolved={resolvedByBout}
@@ -441,6 +446,7 @@ export default function TocBracketScreen() {
                       scroll={false}
                       weight={preview.weightClass}
                       championName={championName}
+                      official={preview.official}
                       layout={preview.layout}
                       winners={winnersByBout}
                       resolved={resolvedByBout}
