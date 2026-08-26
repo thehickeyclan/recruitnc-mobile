@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react"
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -22,6 +23,13 @@ import {
   type RankingClass,
 } from "@/lib/rankings"
 
+/** "Matthew Akins" → "MA", for the handful of prospects with no photo on file. */
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return "?"
+  return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase()
+}
+
 function RankRow({ prospect }: { prospect: RankedProspect }) {
   const podium = prospect.rank <= 3
   // Not every ranking row is linked to a directory profile, and a row without one must not be
@@ -34,20 +42,39 @@ function RankRow({ prospect }: { prospect: RankedProspect }) {
         <Text style={[styles.rankText, podium && styles.rankTextPodium]}>{prospect.rank}</Text>
       </View>
 
+      {/* The face is the point. A list of names reads like a spreadsheet; these are kids people
+          recognise from a mat last weekend. */}
+      {prospect.photoUrl ? (
+        <Image source={{ uri: prospect.photoUrl }} style={styles.photo} resizeMode="cover" />
+      ) : (
+        <View style={[styles.photo, styles.photoEmpty]}>
+          <Text style={styles.initials}>{initialsOf(prospect.name)}</Text>
+        </View>
+      )}
+
       <View style={styles.rowBody}>
         <Text style={styles.name} numberOfLines={1}>
           {prospect.name}
         </Text>
         {prospect.highSchool ? (
-          <Text style={styles.school} numberOfLines={1}>
-            {prospect.highSchool}
-          </Text>
+          <View style={styles.schoolLine}>
+            {prospect.highSchoolLogoUrl ? (
+              <Image
+                source={{ uri: prospect.highSchoolLogoUrl }}
+                style={styles.schoolLogo}
+                resizeMode="contain"
+              />
+            ) : null}
+            <Text style={styles.school} numberOfLines={1}>
+              {prospect.highSchool}
+            </Text>
+          </View>
         ) : null}
         {prospect.stateResult || prospect.gpa || prospect.rankedWin ? (
           <View style={styles.badges}>
             {prospect.stateResult ? (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{prospect.stateResult}</Text>
+              <View style={[styles.badge, styles.badgeGold]}>
+                <Text style={[styles.badgeText, styles.badgeTextGold]}>{prospect.stateResult}</Text>
               </View>
             ) : null}
             {prospect.rankedWin ? (
@@ -63,6 +90,10 @@ function RankRow({ prospect }: { prospect: RankedProspect }) {
           </View>
         ) : null}
       </View>
+
+      {prospect.athleteId ? (
+        <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+      ) : null}
     </>
   )
 
@@ -95,10 +126,10 @@ export default function RankingsScreen() {
       .then((found) => {
         if (cancelled) return
         setClasses(found)
-        // Default to the most recently published edition rather than a hardcoded year,
-        // so the tab keeps pointing at current work as new classes are ranked.
-        const newest = [...found].sort((a, b) => (b.publishedAt ?? "").localeCompare(a.publishedAt ?? ""))[0]
-        setActiveYear(newest?.graduationYear ?? found[0]?.graduationYear ?? null)
+        // The nearest class first — 2027 is the one being recruited now, and the one people
+        // open this tab to check. Publication order put whichever class was edited last on
+        // top, which is an editing detail, not what a reader wants.
+        setActiveYear(found[0]?.graduationYear ?? null)
       })
       .catch((e) => !cancelled && setError(e instanceof Error ? e.message : "Could not load rankings"))
     return () => {
@@ -248,6 +279,13 @@ const styles = StyleSheet.create({
   gateButtonText: { ...type.heading, color: colors.ink },
   error: { ...type.body, color: colors.textSecondary, paddingHorizontal: space.xl, textAlign: "center" },
   list: { paddingHorizontal: space.lg, paddingBottom: space.xxl, gap: space.sm },
+  photo: { width: 46, height: 46, borderRadius: radius.sm, backgroundColor: colors.raised },
+  photoEmpty: { alignItems: "center", justifyContent: "center" },
+  initials: { ...type.label, color: colors.textMuted, fontWeight: "800" },
+  schoolLine: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 2 },
+  schoolLogo: { width: 15, height: 15 },
+  badgeGold: { backgroundColor: "rgba(211, 181, 116, 0.15)", borderColor: colors.gold },
+  badgeTextGold: { color: colors.gold },
   rowPressed: { opacity: 0.65 },
   row: {
     flexDirection: "row",

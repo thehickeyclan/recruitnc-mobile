@@ -11,6 +11,7 @@ export type RankedProspect = {
   rankedWin: boolean
   rank: number
   photoUrl: string | null
+  highSchoolLogoUrl: string | null
 }
 
 export type RankingClass = {
@@ -71,7 +72,57 @@ export async function fetchRankingClasses(): Promise<RankingClass[]> {
 
   return [...byYear.values()]
     .map((c) => ({ ...c, count: Math.min(c.count, maxRankFor(c.graduationYear)) }))
-    .sort((a, b) => b.graduationYear - a.graduationYear)
+    .sort((a, b) => a.graduationYear - b.graduationYear)
+}
+
+
+/**
+ * "Washington highschool" and "Washington High School" are the same school as "Washington".
+ * Logos are keyed on the tidy name, and the rankings feed is typed by hand, so the two only meet
+ * after both sides are reduced to the same thing.
+ */
+function normalizeSchool(raw: string): string {
+  return raw
+    .toLowerCase()
+    .replace(/[.,'&]/g, " ")
+    .replace(/\bhigh\s*school\b|\bhighschool\b|\bhs\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+/** High school marks come from the same table the college marks do. */
+async function fetchSchoolLogos(names: string[]): Promise<Record<string, string>> {
+  if (names.length === 0) return {}
+  const { data } = await supabase
+    .from("logo_mappings")
+    .select("entity_name, logo_url")
+    .eq("entity_type", "highschool")
+
+  const byNormalized = new Map<string, string>()
+  for (const row of data ?? []) {
+    if (!row.entity_name || !row.logo_url) continue
+    byNormalized.set(normalizeSchool(row.entity_name), row.logo_url)
+  }
+
+  const out: Record<string, string> = {}
+  for (const name of names) {
+    const hit = byNormalized.get(normalizeSchool(name))
+    if (hit) out[name] = hit
+  }
+  return out
+}
+
+/**
+ * Photos live on the athlete, not on the ranking row — `profile_image_url` is null for every
+ * published row, so the rankings looked photoless while the pictures sat one join away in the
+ * same place the commitments list reads them from.
+ */
+async function fetchProspectPhotos(athleteIds: string[]): Promise<Record<string, string>> {
+  if (athleteIds.length === 0) return {}
+  const { data } = await supabase.from("athletes").select("id, photourl").in("id", athleteIds)
+  const out: Record<string, string> = {}
+  for (const row of data ?? []) if (row.photourl) out[row.id] = row.photourl
+  return out
 }
 
 export async function fetchRankings(graduationYear: number): Promise<RankedProspect[]> {
@@ -88,15 +139,29 @@ export async function fetchRankings(graduationYear: number): Promise<RankedProsp
 
   if (error) throw new Error(error.message)
 
-  return (data ?? []).map((r) => ({
-    id: r.id,
-    athleteId: (r as { prospect_id?: string | null }).prospect_id ?? null,
-    name: r.name ?? "",
-    highSchool: meaningful(r.high_school),
-    stateResult: meaningful(r.state_result),
-    gpa: typeof r.academic_gpa === "number" ? r.academic_gpa : null,
-    rankedWin: /^yes$/i.test(r.ranked_win ?? ""),
-    rank: r.prospect_ranking ?? 0,
-    photoUrl: r.profile_image_url ?? null,
-  }))
+  const rows = data ?? []
+  const athleteIds = [...new Set(rows.map((r) => (r as { prospect_id?: string | null }).prospect_id).filter(Boolean))] as string[]
+  const schools = [...new Set(rows.map((r) => meaningful(r.high_school)).filter(Boolean))] as string[]
+
+  const [photos, schoolLogos] = await Promise.all([
+    fetchProspectPhotos(athleteIds),
+    fetchSchoolLogos(schools),
+  ])
+
+  return rows.map((r) => {
+    const athleteId = (r as { prospect_id?: string | null }).prospect_id ?? null
+    const highSchool = meaningful(r.high_school)
+    return {
+      id: r.id,
+      athleteId,
+      name: r.name ?? "",
+      highSchool,
+      stateResult: meaningful(r.state_result),
+      gpa: typeof r.academic_gpa === "number" ? r.academic_gpa : null,
+      rankedWin: /^yes$/i.test(r.ranked_win ?? ""),
+      rank: r.prospect_ranking ?? 0,
+      photoUrl: r.profile_image_url ?? (athleteId ? photos[athleteId] ?? null : null),
+      highSchoolLogoUrl: highSchool ? schoolLogos[highSchool] ?? null : null,
+    }
+  })
 }
