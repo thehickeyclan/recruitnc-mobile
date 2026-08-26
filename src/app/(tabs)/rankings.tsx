@@ -70,8 +70,14 @@ function RankRow({ prospect }: { prospect: RankedProspect }) {
             </Text>
           </View>
         ) : null}
-        {prospect.stateResult || prospect.gpa || prospect.rankedWin ? (
+        {prospect.allAmerican || prospect.stateResult || prospect.gpa || prospect.rankedWin ? (
           <View style={styles.badges}>
+            {/* All-American first: it is the strongest thing on the row, and it is national. */}
+            {prospect.allAmerican ? (
+              <View style={[styles.badge, styles.badgeAA]}>
+                <Text style={[styles.badgeText, styles.badgeTextAA]}>ALL-AMERICAN</Text>
+              </View>
+            ) : null}
             {prospect.stateResult ? (
               <View style={[styles.badge, styles.badgeGold]}>
                 <Text style={[styles.badgeText, styles.badgeTextGold]}>{prospect.stateResult}</Text>
@@ -284,6 +290,8 @@ const styles = StyleSheet.create({
   initials: { ...type.label, color: colors.textMuted, fontWeight: "800" },
   schoolLine: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 2 },
   schoolLogo: { width: 15, height: 15 },
+  badgeAA: { backgroundColor: colors.gold, borderColor: colors.gold },
+  badgeTextAA: { color: colors.ink },
   badgeGold: { backgroundColor: "rgba(211, 181, 116, 0.15)", borderColor: colors.gold },
   badgeTextGold: { color: colors.gold },
   rowPressed: { opacity: 0.65 },

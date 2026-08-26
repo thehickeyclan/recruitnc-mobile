@@ -12,6 +12,8 @@ export type RankedProspect = {
   rank: number
   photoUrl: string | null
   highSchoolLogoUrl: string | null
+  /** e.g. "2026 NHSCA All-American" — the strongest credential most of this list holds. */
+  allAmerican: string | null
 }
 
 export type RankingClass = {
@@ -84,8 +86,10 @@ export async function fetchRankingClasses(): Promise<RankingClass[]> {
 function normalizeSchool(raw: string): string {
   return raw
     .toLowerCase()
-    .replace(/[.,'&]/g, " ")
+    .replace(/[.,'&-]/g, " ")
     .replace(/\bhigh\s*school\b|\bhighschool\b|\bhs\b/g, " ")
+    // "St. Stephens" is the same school as "Saint Stephens"; both spellings are in the data.
+    .replace(/\bst\b/g, "saint")
     .replace(/\s+/g, " ")
     .trim()
 }
@@ -125,6 +129,41 @@ async function fetchProspectPhotos(athleteIds: string[]): Promise<Record<string,
   return out
 }
 
+
+/** Top eight at NHSCA is All-American — same rule and same table the TOC field uses. */
+const NHSCA_ALL_AMERICAN_PLACES = 8
+
+/**
+ * All-American finishes, newest first.
+ *
+ * Read from `nhsca_placements` rather than the legacy `nhsca_*_placement` columns on `athletes`:
+ * those are stale, and going by them found three All-Americans in this list where the live table
+ * has ten. The TOC field reads the same place, so the two screens cannot disagree about who is one.
+ */
+async function fetchAllAmericans(athleteIds: string[]): Promise<Record<string, string>> {
+  if (athleteIds.length === 0) return {}
+  const { data } = await supabase
+    .from("nhsca_placements")
+    .select("athlete_id, year, placement")
+    .in("athlete_id", athleteIds)
+
+  const byAthlete = new Map<string, { year: number; placement: number }[]>()
+  for (const row of data ?? []) {
+    const id = typeof row.athlete_id === "string" ? row.athlete_id : ""
+    const place = Number(row.placement)
+    const year = Number(row.year)
+    if (!id || !Number.isInteger(place) || place < 1 || place > NHSCA_ALL_AMERICAN_PLACES) continue
+    byAthlete.set(id, [...(byAthlete.get(id) ?? []), { year, placement: place }])
+  }
+
+  const out: Record<string, string> = {}
+  for (const [id, rows] of byAthlete) {
+    const newest = rows.sort((a, b) => b.year - a.year)[0]
+    if (newest) out[id] = `${newest.year || ""} NHSCA All-American`.trim()
+  }
+  return out
+}
+
 export async function fetchRankings(graduationYear: number): Promise<RankedProspect[]> {
   if (!PUBLISHED_YEARS.includes(graduationYear)) return []
 
@@ -143,9 +182,10 @@ export async function fetchRankings(graduationYear: number): Promise<RankedProsp
   const athleteIds = [...new Set(rows.map((r) => (r as { prospect_id?: string | null }).prospect_id).filter(Boolean))] as string[]
   const schools = [...new Set(rows.map((r) => meaningful(r.high_school)).filter(Boolean))] as string[]
 
-  const [photos, schoolLogos] = await Promise.all([
+  const [photos, schoolLogos, allAmericans] = await Promise.all([
     fetchProspectPhotos(athleteIds),
     fetchSchoolLogos(schools),
+    fetchAllAmericans(athleteIds),
   ])
 
   return rows.map((r) => {
@@ -162,6 +202,7 @@ export async function fetchRankings(graduationYear: number): Promise<RankedProsp
       rank: r.prospect_ranking ?? 0,
       photoUrl: r.profile_image_url ?? (athleteId ? photos[athleteId] ?? null : null),
       highSchoolLogoUrl: highSchool ? schoolLogos[highSchool] ?? null : null,
+      allAmerican: athleteId ? allAmericans[athleteId] ?? null : null,
     }
   })
 }
