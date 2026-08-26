@@ -1,4 +1,5 @@
 import { supabase } from "./supabase"
+import type { FinalPrediction } from "./final-prediction"
 
 /**
  * The bracket pool — submitting an entry, and reading the standings.
@@ -23,6 +24,9 @@ export type PoolEntry = {
   picks: Record<string, string>
   submitted: boolean
   submitted_at: string | null
+  final_method: string | null
+  final_winner_score: number | null
+  final_loser_score: number | null
 }
 
 export type LeaderboardRow = {
@@ -31,6 +35,7 @@ export type LeaderboardRow = {
   points: number
   correct: number
   weightsEntered: number
+  finalsCalled?: number
 }
 
 async function authHeaders(): Promise<Record<string, string>> {
@@ -68,11 +73,12 @@ export async function fetchPoolState(): Promise<{ entries: PoolEntry[]; window: 
 export async function submitEntry(
   weightClass: number,
   picks: Record<number, string>,
+  finalPrediction: FinalPrediction,
 ): Promise<{ picksAccepted: number; boutsInDraw: number }> {
   const response = await fetch(`${requireBase()}/api/toc/pool/entry`, {
     method: "POST",
     headers: await authHeaders(),
-    body: JSON.stringify({ weightClass, picks, submitted: true }),
+    body: JSON.stringify({ weightClass, picks, submitted: true, finalPrediction }),
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })
   const data = (await response.json().catch(() => null)) as

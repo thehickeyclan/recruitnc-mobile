@@ -1,10 +1,18 @@
 import { useCallback, useEffect, useState } from "react"
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from "react-native"
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native"
 import { router } from "expo-router"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors, radius, space, type } from "@/theme/tokens"
 import { useSession } from "@/lib/auth"
 import { fetchPoolState, submitEntry, type PoolWindow } from "@/lib/toc-pool"
+import {
+  FINAL_METHODS,
+  FINAL_METHOD_LABELS,
+  methodNeedsScore,
+  parseFinalMethod,
+  validateFinalPrediction,
+  type FinalMethod,
+} from "@/lib/final-prediction"
 
 /**
  * Entering one weight class in the pool.
@@ -39,6 +47,12 @@ export function PoolSubmit({
   const [busy, setBusy] = useState(false)
   const [loaded, setLoaded] = useState(false)
 
+  // The tiebreaker: how this weight's final ends. Two entrants level on points are separated by
+  // who called it, so this is required to submit rather than an optional flourish.
+  const [method, setMethod] = useState<FinalMethod | null>(null)
+  const [winnerScore, setWinnerScore] = useState("")
+  const [loserScore, setLoserScore] = useState("")
+
   const load = useCallback(async () => {
     if (!session) {
       setLoaded(true)
@@ -49,6 +63,9 @@ export function PoolSubmit({
       setWindow(state.window)
       const mine = state.entries.find((e) => e.weight_class === weightClass)
       setSubmittedAt(mine?.submitted ? (mine.submitted_at ?? "") : null)
+      setMethod(parseFinalMethod(mine?.final_method))
+      setWinnerScore(mine?.final_winner_score?.toString() ?? "")
+      setLoserScore(mine?.final_loser_score?.toString() ?? "")
     } catch {
       // A pool that cannot be reached should not break the bracket underneath it.
       setWindow(null)
@@ -62,9 +79,16 @@ export function PoolSubmit({
   }, [load])
 
   const submit = useCallback(async () => {
+    // Validated here with the same rules the server uses, so a contradiction like "major, 3-1"
+    // is caught while the entrant is still looking at it rather than as a failed request.
+    const prediction = validateFinalPrediction({ method, winnerScore, loserScore })
+    if (!prediction.ok) {
+      Alert.alert("Check the tiebreaker", prediction.error)
+      return
+    }
     setBusy(true)
     try {
-      const result = await submitEntry(weightClass, picks)
+      const result = await submitEntry(weightClass, picks, prediction.value)
       setSubmittedAt(new Date().toISOString())
       // The server validates picks against the official draw. A short count means some could
       // never have scored, and saying "submitted" alone would be a comfortable lie.
@@ -81,7 +105,7 @@ export function PoolSubmit({
     } finally {
       setBusy(false)
     }
-  }, [weightClass, picks])
+  }, [weightClass, picks, method, winnerScore, loserScore])
 
   if (sessionLoading || !loaded) return null
 
@@ -132,6 +156,58 @@ export function PoolSubmit({
             ? `One entry per weight. You can change it until ${window ? dayLabel(window.deadline) : "the deadline"}.`
             : "Pick every bout, then submit."}
       </Text>
+
+      {/* The tiebreaker. Shown while the pool is open, because it is required to submit and
+          discovering that at the moment you tap submit is a bad way to find out. */}
+      <View style={styles.tiebreak}>
+        <Text style={styles.tiebreakTitle}>Tiebreaker — how does the final end?</Text>
+        <View style={styles.methods}>
+          {FINAL_METHODS.map((m) => (
+            <Pressable
+              key={m}
+              style={[styles.method, method === m && styles.methodActive]}
+              onPress={() => setMethod(m)}
+            >
+              <Text style={[styles.methodText, method === m && styles.methodTextActive]}>
+                {FINAL_METHOD_LABELS[m]}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        {method && methodNeedsScore(method) ? (
+          <View style={styles.scores}>
+            <View>
+              <Text style={styles.scoreLabel}>Winner</Text>
+              <TextInput
+                value={winnerScore}
+                onChangeText={(t) => setWinnerScore(t.replace(/[^0-9]/g, ""))}
+                keyboardType="number-pad"
+                maxLength={2}
+                style={styles.scoreInput}
+                placeholderTextColor={colors.textMuted}
+                placeholder="0"
+              />
+            </View>
+            <Text style={styles.dash}>–</Text>
+            <View>
+              <Text style={styles.scoreLabel}>Loser</Text>
+              <TextInput
+                value={loserScore}
+                onChangeText={(t) => setLoserScore(t.replace(/[^0-9]/g, ""))}
+                keyboardType="number-pad"
+                maxLength={2}
+                style={styles.scoreInput}
+                placeholderTextColor={colors.textMuted}
+                placeholder="0"
+              />
+            </View>
+            <Text style={styles.scoreHint}>
+              {method === "MAJ" ? "A major is a margin of 8–14." : "A decision is a margin of 1–7."}
+            </Text>
+          </View>
+        ) : null}
+      </View>
 
       <Pressable
         style={[styles.primary, (!complete || busy) && styles.primaryDisabled]}
@@ -191,6 +267,36 @@ const styles = StyleSheet.create({
     marginTop: space.xs,
   },
   secondaryText: { ...type.label, color: colors.gold, fontWeight: "700" },
+
+  tiebreak: { marginTop: space.sm, gap: space.sm },
+  tiebreakTitle: { ...type.label, color: colors.text, fontWeight: "700" },
+  methods: { flexDirection: "row", flexWrap: "wrap", gap: space.sm },
+  method: {
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radius.pill,
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm,
+  },
+  methodActive: { backgroundColor: colors.gold, borderColor: colors.gold },
+  methodText: { ...type.label, color: colors.textSecondary, fontWeight: "700" },
+  methodTextActive: { color: colors.ink },
+  scores: { flexDirection: "row", alignItems: "flex-end", gap: space.sm, flexWrap: "wrap" },
+  scoreLabel: { ...type.caption, color: colors.textMuted, marginBottom: 4 },
+  scoreInput: {
+    width: 64,
+    height: 46,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radius.sm,
+    backgroundColor: colors.ink,
+    color: colors.text,
+    textAlign: "center",
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  dash: { ...type.title, color: colors.textMuted, paddingBottom: 10 },
+  scoreHint: { ...type.caption, color: colors.textMuted, flex: 1, fontWeight: "500", letterSpacing: 0 },
 
   leaderboardLink: {
     flexDirection: "row",
