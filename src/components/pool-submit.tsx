@@ -46,6 +46,7 @@ export function PoolSubmit({
   const [submittedAt, setSubmittedAt] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [loaded, setLoaded] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   // The tiebreaker: how this weight's final ends. Two entrants level on points are separated by
   // who called it, so this is required to submit rather than an optional flourish.
@@ -61,14 +62,17 @@ export function PoolSubmit({
     try {
       const state = await fetchPoolState()
       setWindow(state.window)
+      setLoadError(null)
       const mine = state.entries.find((e) => e.weight_class === weightClass)
       setSubmittedAt(mine?.submitted ? (mine.submitted_at ?? "") : null)
       setMethod(parseFinalMethod(mine?.final_method))
       setWinnerScore(mine?.final_winner_score?.toString() ?? "")
       setLoserScore(mine?.final_loser_score?.toString() ?? "")
-    } catch {
-      // A pool that cannot be reached should not break the bracket underneath it.
+    } catch (e) {
+      // A pool that cannot be reached must not read as a pool that is open. Failing to the open
+      // state offered a submit button the server would refuse, which is worse than saying so.
       setWindow(null)
+      setLoadError(e instanceof Error ? e.message : "Could not reach the pool.")
     } finally {
       setLoaded(true)
     }
@@ -134,7 +138,19 @@ export function PoolSubmit({
 
   const submitted = submittedAt != null
 
-  if (window && !window.open) {
+  if (!window) {
+    return (
+      <View style={styles.card}>
+        <Text style={styles.title}>Pool unavailable</Text>
+        <Text style={styles.detail}>
+          {loadError ?? "Could not reach the pool."} Your picks are saved on this phone either way.
+        </Text>
+        {leaderboard}
+      </View>
+    )
+  }
+
+  if (!window.open) {
     return (
       <View style={styles.card}>
         <Text style={styles.title}>{submitted ? "Your entry is locked in" : "Entries are not open yet"}</Text>
@@ -151,9 +167,9 @@ export function PoolSubmit({
       <Text style={styles.title}>{submitted ? "Submitted" : "Enter the pool"}</Text>
       <Text style={styles.detail}>
         {submitted
-          ? `Your ${weightClass} lbs bracket is in. You can change it until ${window ? dayLabel(window.deadline) : "the deadline"}.`
+          ? `Your ${weightClass} lbs bracket is in. You can change it until ${dayLabel(window.deadline)}.`
           : complete
-            ? `One entry per weight. You can change it until ${window ? dayLabel(window.deadline) : "the deadline"}.`
+            ? `One entry per weight. You can change it until ${dayLabel(window.deadline)}.`
             : "Pick every bout, then submit."}
       </Text>
 
