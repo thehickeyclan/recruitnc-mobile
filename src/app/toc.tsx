@@ -111,6 +111,12 @@ export default function TocHubScreen() {
             detail="Seed it yourself and run the draw"
             onPress={() => router.push("/toc-bracket")}
           />
+          <Row
+            icon="podium"
+            title="Leaderboard"
+            detail="How every entry is scoring"
+            onPress={() => router.push("/toc-leaderboard")}
+          />
         </View>
 
         <Text style={styles.groupLabel}>THE EVENT</Text>

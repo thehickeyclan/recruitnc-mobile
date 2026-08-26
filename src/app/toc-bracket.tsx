@@ -17,6 +17,7 @@ import {
 import { BracketCanvas } from "@/components/bracket-canvas"
 import { shareBracketImage } from "@/lib/share-bracket"
 import { championOf, pickProgress, simulate, updatePick, type SimulationPicks } from "@/lib/bracket-simulation"
+import { PoolSubmit } from "@/components/pool-submit"
 
 const ORDER_KEY = "recruitnc.tocBracketOrders"
 const PICKS_KEY = "recruitnc.tocBracketPicks"
@@ -446,6 +447,12 @@ export default function TocBracketScreen() {
                       onPickWinner={tapSlot}
                     />
                   </View>
+
+                  <PoolSubmit
+                    weightClass={preview.weightClass}
+                    picks={picks}
+                    complete={progress.total > 0 && progress.picked === progress.total}
+                  />
 
                   <Pressable style={styles.shareButton} onPress={() => void share()} disabled={sharing}>
                     {sharing ? (
