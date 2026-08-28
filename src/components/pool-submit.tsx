@@ -113,6 +113,13 @@ export function PoolSubmit({
 
   if (sessionLoading || !loaded) return null
 
+  const privacyNote = (
+    <Text style={styles.privacy}>
+      Your bracket stays private. The leaderboard shows points and a first name only — nobody sees
+      who you picked, during the tournament or after it.
+    </Text>
+  )
+
   const leaderboard = (
     <Pressable style={styles.leaderboardLink} onPress={() => router.push("/toc-leaderboard")} hitSlop={6}>
       <Ionicons name="podium" size={14} color={colors.gold} />
@@ -131,6 +138,7 @@ export function PoolSubmit({
         <Pressable style={styles.secondary} onPress={() => router.push("/sign-in")}>
           <Text style={styles.secondaryText}>Sign in or create an account</Text>
         </Pressable>
+        {privacyNote}
         {leaderboard}
       </View>
     )
@@ -145,6 +153,7 @@ export function PoolSubmit({
         <Text style={styles.detail}>
           {loadError ?? "Could not reach the pool."} Your picks are saved on this phone either way.
         </Text>
+        {privacyNote}
         {leaderboard}
       </View>
     )
@@ -157,6 +166,7 @@ export function PoolSubmit({
         <Text style={styles.detail}>
           {window.reason ?? `The pool opens ${dayLabel(window.opensAt)}.`}
         </Text>
+        {privacyNote}
         {leaderboard}
       </View>
     )
@@ -242,6 +252,8 @@ export function PoolSubmit({
         )}
       </Pressable>
 
+      {privacyNote}
+
       {leaderboard}
     </View>
   )
@@ -314,6 +326,15 @@ const styles = StyleSheet.create({
   dash: { ...type.title, color: colors.textMuted, paddingBottom: 10 },
   scoreHint: { ...type.caption, color: colors.textMuted, flex: 1, fontWeight: "500", letterSpacing: 0 },
 
+  privacy: {
+    ...type.caption,
+    color: colors.textMuted,
+    fontWeight: "500",
+    letterSpacing: 0,
+    lineHeight: 15,
+    textAlign: "center",
+    paddingTop: space.xs,
+  },
   leaderboardLink: {
     flexDirection: "row",
     alignItems: "center",

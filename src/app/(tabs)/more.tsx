@@ -141,14 +141,6 @@ export default function MoreScreen() {
 
         <Text style={styles.sectionHeading}>TOURNAMENT OF CHAMPIONS</Text>
         <View style={styles.group}>
-          <Pressable style={styles.row} onPress={() => router.push("/toc")}>
-            <View style={styles.rowBody}>
-              <Text style={styles.rowTitle}>Tournament of Champions</Text>
-              <Text style={styles.rowDetail}>Tickets, schedule and everything about the event</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-          </Pressable>
-          <View style={styles.rowDivider} />
           <Pressable style={styles.row} onPress={() => router.push("/toc-field")}>
             <View style={styles.rowBody}>
               <Text style={styles.rowTitle}>The Field</Text>

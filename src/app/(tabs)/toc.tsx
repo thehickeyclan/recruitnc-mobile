@@ -81,14 +81,9 @@ export default function TocHubScreen() {
   return (
     <SafeAreaView style={styles.screen} edges={["top"]}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Pressable style={styles.back} onPress={() => router.back()} hitSlop={8}>
-          <Ionicons name="chevron-back" size={20} color={colors.textSecondary} />
-          <Text style={styles.backText}>Home</Text>
-        </Pressable>
-
         <View style={styles.head}>
           <Image
-            source={require("../../assets/images/toc-logo.png")}
+            source={require("../../../assets/images/toc-logo.png")}
             style={styles.logo}
             resizeMode="contain"
           />
@@ -173,9 +168,6 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.ink },
   content: { padding: space.lg, paddingBottom: space.xxl * 2, gap: space.md },
   flex: { flex: 1 },
-
-  back: { flexDirection: "row", alignItems: "center", gap: 2, marginBottom: space.xs },
-  backText: { ...type.label, color: colors.textSecondary },
 
   head: { flexDirection: "row", alignItems: "center", gap: space.md, marginBottom: space.sm },
   logo: { width: 64, height: 64 },

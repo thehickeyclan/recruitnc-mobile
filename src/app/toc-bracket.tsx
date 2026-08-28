@@ -423,6 +423,7 @@ export default function TocBracketScreen() {
                       <Ionicons name="information-circle" size={15} color={colors.gold} />
                       <Text style={styles.noticeText}>
                         Your projection — official brackets and seeds are released 11 September.
+                        Nobody else can see your picks.
                       </Text>
                     </View>
                   ) : null}
