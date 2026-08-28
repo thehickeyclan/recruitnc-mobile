@@ -78,9 +78,12 @@ export default function TocPoolNameScreen() {
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.body}>
+          {/* "App R." already ends in a full stop, so a sentence-final one gives "App R..". Add it
+              only when the fallback does not end the sentence itself. */}
           <Text style={styles.intro}>
             Pick what you appear as on the standings. Leave it empty and you show as{" "}
-            <Text style={styles.strong}>{fallback}</Text>.
+            <Text style={styles.strong}>{fallback}</Text>
+            {fallback.endsWith(".") ? "" : "."}
           </Text>
 
           <TextInput
