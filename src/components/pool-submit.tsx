@@ -116,8 +116,9 @@ export function PoolSubmit({
   const privacyNote = (
     <Text style={styles.privacy}>
       Your bracket stays private. NC United never shares or publishes anybody's picks — the
-      leaderboard shows points and a first name only, during the tournament and after it. The only
-      way your bracket goes anywhere is if you send the picture yourself.
+      leaderboard shows a first name, a last initial and points, never who you picked, during the
+      tournament or after it. The only way your bracket goes anywhere is if you send the picture
+      yourself.
     </Text>
   )
 
