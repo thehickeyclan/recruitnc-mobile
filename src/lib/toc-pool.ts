@@ -32,16 +32,18 @@ export type PoolEntry = {
 export type LeaderboardRow = {
   rank: number
   name: string
+  /** Set on the row belonging to whoever is reading. */
+  isYou?: boolean
   points: number
   correct: number
   weightsEntered: number
   finalsCalled?: number
 }
 
-async function authHeaders(): Promise<Record<string, string>> {
+async function authHeaders(signedOutMessage = "Sign in to enter the pool."): Promise<Record<string, string>> {
   const { data } = await supabase.auth.getSession()
   const token = data.session?.access_token
-  if (!token) throw new Error("Sign in to enter the pool.")
+  if (!token) throw new Error(signedOutMessage)
   return { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
 }
 
@@ -88,14 +90,17 @@ export async function submitEntry(
   return { picksAccepted: data.picksAccepted ?? 0, boutsInDraw: data.boutsInDraw ?? 0 }
 }
 
-/** Standings. Public — no sign-in, and the server never returns anyone's picks. */
+/**
+ * Standings. Signed in only — most entrants are minors and the board carries their names — and
+ * the server never returns anyone's picks.
+ */
 export async function fetchLeaderboard(): Promise<{
   standings: LeaderboardRow[]
   entrants: number
   boutsDecided: number
 }> {
   const response = await fetch(`${requireBase()}/api/toc/pool/leaderboard`, {
-    headers: { Accept: "application/json" },
+    headers: await authHeaders("Sign in to see the leaderboard."),
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })
   const data = (await response.json().catch(() => null)) as {
@@ -117,4 +122,32 @@ export function windowLabel(window: PoolWindow | null): string {
   if (!window) return ""
   if (window.open) return "Entries are open"
   return window.reason ?? "Entries are closed"
+}
+
+/** The leaderboard name this account has chosen, and what it falls back to without one. */
+export async function fetchDisplayName(): Promise<{ displayName: string | null; fallback: string }> {
+  const response = await fetch(`${requireBase()}/api/toc/pool/display-name`, {
+    headers: await authHeaders("Sign in to set a leaderboard name."),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  })
+  const data = (await response.json().catch(() => null)) as
+    | { displayName?: string | null; fallback?: string; error?: string }
+    | null
+  if (!response.ok || !data) throw new Error(data?.error ?? "Could not load your leaderboard name.")
+  return { displayName: data.displayName ?? null, fallback: data.fallback ?? "Entrant" }
+}
+
+/** Sets it, or clears it back to a first name and last initial when given an empty string. */
+export async function saveDisplayName(displayName: string): Promise<string | null> {
+  const response = await fetch(`${requireBase()}/api/toc/pool/display-name`, {
+    method: "POST",
+    headers: await authHeaders(),
+    body: JSON.stringify({ displayName }),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  })
+  const data = (await response.json().catch(() => null)) as
+    | { displayName?: string | null; error?: string }
+    | null
+  if (!response.ok || !data) throw new Error(data?.error ?? "Could not save that name.")
+  return data.displayName ?? null
 }

@@ -116,17 +116,23 @@ export function PoolSubmit({
   const privacyNote = (
     <Text style={styles.privacy}>
       Your bracket stays private. NC United never shares or publishes anybody's picks — the
-      leaderboard shows a first name, a last initial and points, never who you picked, during the
-      tournament or after it. The only way your bracket goes anywhere is if you send the picture
-      yourself.
+      leaderboard shows a name and points, never who you picked, during the tournament or after
+      it. You can choose the name you appear under; without one it is your first name and last
+      initial. The only way your bracket goes anywhere is if you send the picture yourself.
     </Text>
   )
 
   const leaderboard = (
-    <Pressable style={styles.leaderboardLink} onPress={() => router.push("/toc-leaderboard")} hitSlop={6}>
-      <Ionicons name="podium" size={14} color={colors.gold} />
-      <Text style={styles.leaderboardText}>Leaderboard</Text>
-    </Pressable>
+    <View style={styles.linkRow}>
+      <Pressable style={styles.leaderboardLink} onPress={() => router.push("/toc-leaderboard")} hitSlop={6}>
+        <Ionicons name="podium" size={14} color={colors.gold} />
+        <Text style={styles.leaderboardText}>Leaderboard</Text>
+      </Pressable>
+      <Pressable style={styles.leaderboardLink} onPress={() => router.push("/toc-pool-name")} hitSlop={6}>
+        <Ionicons name="create-outline" size={14} color={colors.gold} />
+        <Text style={styles.leaderboardText}>Your name</Text>
+      </Pressable>
+    </View>
   )
 
   if (!session) {
@@ -272,6 +278,7 @@ const styles = StyleSheet.create({
     gap: space.sm,
   },
   title: { ...type.heading, color: colors.text },
+  linkRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: space.lg },
   detail: { ...type.label, color: colors.textSecondary, fontWeight: "500", lineHeight: 19 },
 
   primary: {

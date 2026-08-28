@@ -13,8 +13,11 @@ import { fetchLeaderboard, type LeaderboardRow } from "@/lib/toc-pool"
  * not afterwards — and the endpoint behind this never returns them, so the promise holds even if
  * this screen were changed carelessly.
  *
- * Names arrive already shortened to a first name and a last initial, because most entrants are
- * minors and a full name does not belong on a board anyone can open.
+ * Names are whatever an entrant chose, or a first name and a last initial for anybody who did
+ * not choose — most entrants are minors and a full name does not belong on a board.
+ *
+ * Your own row is marked. Wanting to find yourself is most of why anybody asks for more real name
+ * on a leaderboard, and answering it this way costs nobody any privacy.
  */
 export default function TocLeaderboardScreen() {
   const [rows, setRows] = useState<LeaderboardRow[]>([])
@@ -90,12 +93,15 @@ export default function TocLeaderboardScreen() {
         ) : (
           <View style={styles.group}>
             {rows.map((row) => (
-              <View key={`${row.rank}-${row.name}`} style={styles.row}>
+              <View key={`${row.rank}-${row.name}`} style={[styles.row, row.isYou && styles.rowYou]}>
                 <View style={[styles.rank, row.rank <= 3 && styles.rankTop]}>
                   <Text style={[styles.rankText, row.rank <= 3 && styles.rankTextTop]}>{row.rank}</Text>
                 </View>
                 <View style={styles.flex}>
-                  <Text style={styles.name}>{row.name}</Text>
+                  <Text style={[styles.name, row.isYou && styles.nameYou]}>
+                    {row.name}
+                    {row.isYou ? <Text style={styles.youTag}>  YOU</Text> : null}
+                  </Text>
                   <Text style={styles.detail}>
                     {row.correct} correct · {row.weightsEntered}{" "}
                     {row.weightsEntered === 1 ? "weight" : "weights"}
@@ -106,6 +112,13 @@ export default function TocLeaderboardScreen() {
             ))}
           </View>
         )}
+
+        {!loading && !error ? (
+          <Pressable style={styles.nameLinkRow} onPress={() => router.push("/toc-pool-name")} hitSlop={6}>
+            <Ionicons name="create-outline" size={14} color={colors.gold} />
+            <Text style={styles.nameLink}>Change how your name shows here</Text>
+          </Pressable>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   )
@@ -121,6 +134,14 @@ const styles = StyleSheet.create({
   subtitle: { ...type.label, color: colors.textMuted, marginTop: space.xs, fontWeight: "500" },
 
   content: { paddingHorizontal: space.lg, paddingBottom: space.xxl * 3 },
+  nameLink: { ...type.label, color: colors.gold, fontWeight: "700" },
+  nameLinkRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: space.xs,
+    marginTop: space.md,
+  },
   spinner: { marginTop: space.xxl },
 
   group: {
@@ -150,6 +171,9 @@ const styles = StyleSheet.create({
   rankText: { ...type.label, color: colors.textSecondary, fontWeight: "800" },
   rankTextTop: { color: colors.ink },
   name: { ...type.label, color: colors.text, fontWeight: "700" },
+  nameYou: { color: colors.gold },
+  youTag: { ...type.caption, color: colors.gold, fontWeight: "700", letterSpacing: 1 },
+  rowYou: { backgroundColor: colors.gold + "14" },
   detail: { ...type.caption, color: colors.textMuted, marginTop: 2, fontWeight: "600", letterSpacing: 0.2 },
   points: { ...type.title, color: colors.gold },
 
