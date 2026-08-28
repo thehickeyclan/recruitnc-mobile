@@ -19,6 +19,9 @@ import { TocMadness } from "@/components/toc-madness"
 
 const WEB = process.env.EXPO_PUBLIC_WEB_BASE_URL
 const TOC_WEB = `${WEB}/tournament-of-champions`
+// The GoFan event itself. Sending people to the tournament page first meant reading a page to
+// find a button, when they had already decided to come.
+const TOC_TICKETS = "https://gofan.co/event/6745154?schoolId=NC101846"
 
 function openWeb(url: string) {
   void WebBrowser.openBrowserAsync(url, {
@@ -123,9 +126,10 @@ export default function TocHubScreen() {
         <View style={styles.group}>
           <Row
             icon="ticket"
-            title="Tickets"
+            title="Buy tickets"
             detail="Seating is limited — families first"
-            onPress={() => openWeb(TOC_WEB)}
+            accent
+            onPress={() => openWeb(TOC_TICKETS)}
           />
           <Row
             icon="information-circle"

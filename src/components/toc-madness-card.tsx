@@ -46,6 +46,22 @@ export function TocMadnessCard({
         <Text style={styles.ctaText}>{seedsOut ? "Submit your bracket" : "Start your bracket"}</Text>
       </Pressable>
 
+      <Pressable
+        onPress={() =>
+          void import("expo-web-browser").then((wb) =>
+            wb.openBrowserAsync("https://gofan.co/event/6745154?schoolId=NC101846", {
+              presentationStyle: wb.WebBrowserPresentationStyle.PAGE_SHEET,
+              toolbarColor: colors.ink,
+              controlsColor: colors.gold,
+              dismissButtonStyle: "done",
+            }),
+          )
+        }
+        hitSlop={6}
+      >
+        <Text style={styles.tickets}>Buy tickets for 18–19 September</Text>
+      </Pressable>
+
       {total > 0 ? (
         <Pressable onPress={onOpenToc} hitSlop={6}>
           <Text style={styles.fine}>
@@ -84,6 +100,13 @@ const styles = StyleSheet.create({
     padding: space.md,
   },
   ctaText: { ...type.label, color: colors.ink, fontWeight: "800" },
+  tickets: {
+    ...type.label,
+    color: colors.gold,
+    textAlign: "center",
+    fontWeight: "700",
+    textDecorationLine: "underline",
+  },
   fine: {
     ...type.caption,
     color: colors.textMuted,
