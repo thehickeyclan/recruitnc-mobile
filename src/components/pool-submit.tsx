@@ -115,8 +115,9 @@ export function PoolSubmit({
 
   const privacyNote = (
     <Text style={styles.privacy}>
-      Your bracket stays private. The leaderboard shows points and a first name only — nobody sees
-      who you picked, during the tournament or after it.
+      Your bracket stays private. NC United never shares or publishes anybody's picks — the
+      leaderboard shows points and a first name only, during the tournament and after it. The only
+      way your bracket goes anywhere is if you send the picture yourself.
     </Text>
   )
 
@@ -246,7 +247,7 @@ export function PoolSubmit({
           <>
             <Ionicons name={submitted ? "refresh" : "checkmark-circle"} size={16} color={colors.ink} />
             <Text style={styles.primaryText}>
-              {submitted ? "Update my entry" : `Submit ${weightClass} lbs`}
+              {submitted ? "Update my entry" : `Enter ${weightClass} lbs in the pool`}
             </Text>
           </>
         )}

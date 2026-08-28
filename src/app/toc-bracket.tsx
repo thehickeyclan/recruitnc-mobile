@@ -423,7 +423,7 @@ export default function TocBracketScreen() {
                       <Ionicons name="information-circle" size={15} color={colors.gold} />
                       <Text style={styles.noticeText}>
                         Your projection — official brackets and seeds are released 11 September.
-                        Nobody else can see your picks.
+                        Nobody else can see your picks, and NC United never publishes them.
                       </Text>
                     </View>
                   ) : null}
@@ -461,16 +461,23 @@ export default function TocBracketScreen() {
                     complete={progress.total > 0 && progress.picked === progress.total}
                   />
 
+                  {/* Deliberately quieter than Submit, and directly under the pool card, because a
+                      parent read a gold "Share my bracket" sitting there as the way to enter. One
+                      filled gold button per screen; this one makes a picture and nothing else. */}
                   <Pressable style={styles.shareButton} onPress={() => void share()} disabled={sharing}>
                     {sharing ? (
-                      <ActivityIndicator color={colors.ink} size="small" />
+                      <ActivityIndicator color={colors.gold} size="small" />
                     ) : (
                       <>
-                        <Ionicons name="share-outline" size={16} color={colors.ink} />
-                        <Text style={styles.shareButtonText}>Share my bracket</Text>
+                        <Ionicons name="image-outline" size={16} color={colors.gold} />
+                        <Text style={styles.shareButtonText}>Save an image to share</Text>
                       </>
                     )}
                   </Pressable>
+                  <Text style={styles.shareNote}>
+                    Makes a picture on your phone to send to whoever you like. It is not an entry, and it
+                    sends nothing to NC United.
+                  </Text>
                 </>
               ) : busy ? (
                 <View style={styles.centre}>
@@ -558,11 +565,19 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: space.sm,
     marginTop: space.md,
-    backgroundColor: colors.gold,
+    borderWidth: 1,
+    borderColor: colors.gold,
     borderRadius: radius.pill,
     paddingVertical: space.md,
   },
-  shareButtonText: { ...type.label, color: colors.ink, fontWeight: "700" },
+  shareButtonText: { ...type.label, color: colors.gold, fontWeight: "700" },
+  shareNote: {
+    ...type.caption,
+    color: colors.textMuted,
+    textAlign: "center",
+    marginTop: space.sm,
+    lineHeight: 16,
+  },
   canvasWrap: {
     marginTop: space.md,
     marginHorizontal: -space.lg,
