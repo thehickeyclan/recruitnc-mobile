@@ -15,6 +15,7 @@ import Ionicons from "@expo/vector-icons/Ionicons"
 import { router } from "expo-router"
 import { colors, radius, space, type } from "@/theme/tokens"
 import { AnswerText } from "@/components/answer-text"
+import { DataDawgAvatar } from "@/components/data-dawg-avatar"
 import { askDataDawg, voteOnAnswer, type ChatTurn } from "@/lib/data-dawg"
 import { useSession } from "@/lib/auth"
 
@@ -108,14 +109,17 @@ export default function AskScreen() {
     <SafeAreaView style={styles.screen} edges={["top"]}>
       <View style={styles.header}>
         <View style={styles.headerRow}>
-          <View style={styles.flexShrink}>
-            <Text style={styles.title} maxFontSizeMultiplier={1.4}>Data Dawg</Text>
+          <View style={styles.identityRow}>
+            <DataDawgAvatar size={44} />
+            <View style={styles.flexShrink}>
+              <Text style={styles.title} maxFontSizeMultiplier={1.4}>Data Dawg</Text>
+              <Text style={styles.subtitle}>Ask about commitments, rankings and results</Text>
+            </View>
           </View>
           <Pressable onPress={() => router.back()} hitSlop={12} accessibilityLabel="Close">
             <Ionicons name="close" size={26} color={colors.textMuted} />
           </Pressable>
         </View>
-        <Text style={styles.subtitle}>Ask about commitments, rankings and results</Text>
       </View>
 
       <KeyboardAvoidingView
@@ -125,7 +129,7 @@ export default function AskScreen() {
       >
         {messages.length === 0 ? (
           <View style={styles.empty}>
-            <Ionicons name="chatbubbles-outline" size={36} color={colors.line} />
+            <DataDawgAvatar size={88} />
             <Text style={styles.emptyText}>Try one of these</Text>
             {SUGGESTIONS.map((s) => (
               <Pressable key={s} style={styles.suggestion} onPress={() => void send(s)}>
@@ -147,25 +151,28 @@ export default function AskScreen() {
                 </View>
               ) : (
                 <View style={styles.answerBubble}>
-                  <AnswerText content={item.content} />
-                  {item.messageId ? (
-                    <View style={styles.voteRow}>
-                      <Pressable onPress={() => vote(item, "up")} hitSlop={8}>
-                        <Ionicons
-                          name={item.vote === "up" ? "thumbs-up" : "thumbs-up-outline"}
-                          size={15}
-                          color={item.vote === "up" ? colors.gold : colors.textMuted}
-                        />
-                      </Pressable>
-                      <Pressable onPress={() => vote(item, "down")} hitSlop={8}>
-                        <Ionicons
-                          name={item.vote === "down" ? "thumbs-down" : "thumbs-down-outline"}
-                          size={15}
-                          color={item.vote === "down" ? colors.red : colors.textMuted}
-                        />
-                      </Pressable>
-                    </View>
-                  ) : null}
+                  <DataDawgAvatar size={30} />
+                  <View style={styles.answerContent}>
+                    <AnswerText content={item.content} />
+                    {item.messageId ? (
+                      <View style={styles.voteRow}>
+                        <Pressable onPress={() => vote(item, "up")} hitSlop={8}>
+                          <Ionicons
+                            name={item.vote === "up" ? "thumbs-up" : "thumbs-up-outline"}
+                            size={15}
+                            color={item.vote === "up" ? colors.gold : colors.textMuted}
+                          />
+                        </Pressable>
+                        <Pressable onPress={() => vote(item, "down")} hitSlop={8}>
+                          <Ionicons
+                            name={item.vote === "down" ? "thumbs-down" : "thumbs-down-outline"}
+                            size={15}
+                            color={item.vote === "down" ? colors.red : colors.textMuted}
+                          />
+                        </Pressable>
+                      </View>
+                    ) : null}
+                  </View>
                 </View>
               )
             }
@@ -174,6 +181,7 @@ export default function AskScreen() {
 
         {busy ? (
           <View style={styles.thinking}>
+            <DataDawgAvatar size={26} />
             <ActivityIndicator color={colors.gold} size="small" />
             <Text style={styles.thinkingText}>Data Dawg is digging…</Text>
             <Pressable onPress={cancel} hitSlop={10} accessibilityLabel="Stop this question">
@@ -209,7 +217,8 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.ink },
   flex: { flex: 1 },
   header: { paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: space.md },
-  headerRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" },
+  headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: space.md },
+  identityRow: { flex: 1, flexDirection: "row", alignItems: "center", gap: space.md },
   flexShrink: { flexShrink: 1 },
   title: { ...type.display, color: colors.text },
   subtitle: { ...type.body, color: colors.textSecondary, marginTop: space.xs },
@@ -235,12 +244,16 @@ const styles = StyleSheet.create({
   },
   userText: { ...type.body, color: colors.ink, fontWeight: "600" },
   answerBubble: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: space.sm,
     backgroundColor: colors.raised,
     borderWidth: 1,
     borderColor: colors.line,
     borderRadius: radius.lg,
     padding: space.md,
   },
+  answerContent: { flex: 1 },
   voteRow: { flexDirection: "row", gap: space.lg, marginTop: space.md },
   thinking: { flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: space.lg, paddingBottom: space.sm },
   thinkingText: { ...type.label, color: colors.textMuted },

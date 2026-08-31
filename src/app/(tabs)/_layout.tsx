@@ -3,6 +3,7 @@ import { Tabs, router } from "expo-router"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors } from "@/theme/tokens"
 import { AlertsPrimer } from "@/components/alerts-primer"
+import { DataDawgAvatar } from "@/components/data-dawg-avatar"
 
 export default function TabsLayout() {
   return (
@@ -76,7 +77,7 @@ export default function TabsLayout() {
 
       {/* Floating Data Dawg launcher — mirrors the website, and keeps the tab bar to five slots. */}
       <Pressable style={styles.fab} onPress={() => router.push("/ask")} accessibilityLabel="Ask Data Dawg">
-        <Ionicons name="paw" size={18} color={colors.ink} />
+        <DataDawgAvatar size={28} />
         <Text style={styles.fabText}>Data Dawg</Text>
       </Pressable>
     </View>
