@@ -1,3 +1,5 @@
+import { clientHeader } from "@/lib/client-header"
+
 const BASE = process.env.EXPO_PUBLIC_WEB_BASE_URL
 
 /**
@@ -32,7 +34,7 @@ export type DawgReply = {
 }
 
 function requestHeaders(accessToken?: string | null): Record<string, string> {
-  const headers: Record<string, string> = { "Content-Type": "application/json" }
+  const headers: Record<string, string> = { ...clientHeader(), "Content-Type": "application/json" }
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`
   return headers
 }

@@ -1,3 +1,5 @@
+import { clientHeader } from "@/lib/client-header"
+
 const BASE = process.env.EXPO_PUBLIC_WEB_BASE_URL
 
 const REQUEST_TIMEOUT_MS = 20_000
@@ -98,7 +100,7 @@ export async function buildBracketPreview(
 
   const response = await fetch(`${BASE}/api/toc/brackets/preview`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    headers: { ...clientHeader(), "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({ weightClass, athleteIds }),
     signal: signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })

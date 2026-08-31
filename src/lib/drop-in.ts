@@ -1,3 +1,5 @@
+import { clientHeader } from "@/lib/client-header"
+
 const BASE = process.env.EXPO_PUBLIC_WEB_BASE_URL
 
 export type DropInPayload = {
@@ -20,7 +22,7 @@ export type DropInPayload = {
 export async function createDropInCheckout(payload: DropInPayload): Promise<string> {
   const response = await fetch(`${BASE}/api/calendar/stripe/create-checkout-session`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { ...clientHeader(), "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   })
 

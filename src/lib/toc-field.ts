@@ -1,3 +1,5 @@
+import { clientHeader } from "@/lib/client-header"
+
 const BASE = process.env.EXPO_PUBLIC_WEB_BASE_URL
 
 /** The field can be a few hundred KB once several weights are out. */
@@ -50,7 +52,7 @@ export async function fetchTocField(signal?: AbortSignal): Promise<TocField> {
   if (!BASE) throw new Error("This build has no EXPO_PUBLIC_WEB_BASE_URL.")
 
   const response = await fetch(`${BASE}/api/toc/field`, {
-    headers: { Accept: "application/json" },
+    headers: { ...clientHeader(), Accept: "application/json" },
     signal: signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })
 

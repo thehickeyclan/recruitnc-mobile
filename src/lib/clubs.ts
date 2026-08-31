@@ -1,3 +1,5 @@
+import { clientHeader } from "@/lib/client-header"
+
 const BASE = process.env.EXPO_PUBLIC_WEB_BASE_URL
 
 const REQUEST_TIMEOUT_MS = 20_000
@@ -47,7 +49,7 @@ export async function fetchClubs(signal?: AbortSignal): Promise<ClubDirectory> {
   if (!BASE) throw new Error("This build has no EXPO_PUBLIC_WEB_BASE_URL.")
 
   const response = await fetch(`${BASE}/api/clubs/map-pins`, {
-    headers: { Accept: "application/json" },
+    headers: { ...clientHeader(), Accept: "application/json" },
     signal: signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })
 

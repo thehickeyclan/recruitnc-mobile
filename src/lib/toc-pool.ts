@@ -1,5 +1,6 @@
 import { supabase } from "./supabase"
 import type { FinalPrediction } from "./final-prediction"
+import { clientHeader } from "@/lib/client-header"
 
 /**
  * The bracket pool — submitting an entry, and reading the standings.
@@ -44,7 +45,7 @@ async function authHeaders(signedOutMessage = "Sign in to enter the pool."): Pro
   const { data } = await supabase.auth.getSession()
   const token = data.session?.access_token
   if (!token) throw new Error(signedOutMessage)
-  return { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
+  return { ...clientHeader(), Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
 }
 
 function requireBase(): string {

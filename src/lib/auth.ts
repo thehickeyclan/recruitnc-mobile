@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
 import type { Session } from "@supabase/supabase-js"
 import { supabase } from "./supabase"
+import { clientHeader } from "@/lib/client-header"
 
 const BASE = process.env.EXPO_PUBLIC_WEB_BASE_URL
 
@@ -71,7 +72,7 @@ export async function signUp(input: {
 }): Promise<{ needsVerification: boolean }> {
   const response = await fetch(`${BASE}/api/auth/signup`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { ...clientHeader(), "Content-Type": "application/json" },
     body: JSON.stringify(input),
   })
   const data = (await response.json().catch(() => null)) as { error?: string } | null
@@ -100,7 +101,7 @@ export async function deleteAccount(): Promise<void> {
 
   const response = await fetch(`${BASE}/api/account/delete`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { ...clientHeader(), Authorization: `Bearer ${token}` },
   })
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as { error?: string } | null

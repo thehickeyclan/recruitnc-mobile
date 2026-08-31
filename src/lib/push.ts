@@ -2,6 +2,7 @@ import * as Device from "expo-device"
 import * as Notifications from "expo-notifications"
 import Constants from "expo-constants"
 import { Platform } from "react-native"
+import { clientHeader } from "@/lib/client-header"
 
 const BASE = process.env.EXPO_PUBLIC_WEB_BASE_URL
 
@@ -89,7 +90,7 @@ export async function registerForPush(): Promise<string> {
 export async function syncDevice(token: string, prefs: AlertPrefs): Promise<void> {
   const response = await fetch(`${BASE}/api/push/register`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { ...clientHeader(), "Content-Type": "application/json" },
     body: JSON.stringify({ expoPushToken: token, platform: Platform.OS, prefs }),
   })
   if (!response.ok) {
