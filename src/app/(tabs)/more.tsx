@@ -158,6 +158,17 @@ export default function MoreScreen() {
           </Pressable>
         </View>
 
+        <Text style={styles.sectionHeading}>NC UNITED BLUE</Text>
+        <View style={styles.group}>
+          <Pressable style={styles.row} onPress={() => router.push("/membership-card")}>
+            <View style={styles.rowBody}>
+              <Text style={styles.rowTitle}>Membership card</Text>
+              <Text style={styles.rowDetail}>Show at partner clubs for your free monthly drop-in</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </Pressable>
+        </View>
+
         <Text style={styles.sectionHeading}>FIND A CLUB</Text>
         <View style={styles.group}>
           <Pressable style={styles.row} onPress={() => router.push("/clubs")}>
