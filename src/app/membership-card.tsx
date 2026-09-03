@@ -4,10 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context"
 import { Stack } from "expo-router"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors, radius, space, type } from "@/theme/tokens"
-import { fetchMembershipCards, recordDropIn, type MembershipCard } from "@/lib/membership-card"
-
-/** The partner clubs a Blue membership opens. One for now; the list is what will grow. */
-const PARTNER_CLUBS = ["Darkhorse Wrestling Club"] as const
+import { fetchMembershipCards, recordDropIn, type MembershipCard, type PartnerDropIn } from "@/lib/membership-card"
 
 function formatDate(iso: string | null): string {
   if (!iso) return ""
@@ -56,22 +53,22 @@ export default function MembershipCardScreen() {
   }, [load])
 
   const claim = useCallback(
-    (card: MembershipCard) => {
+    (card: MembershipCard, club: PartnerDropIn) => {
       /**
        * Confirmed before it is written, and written by the coach's own tap. A mis-tap costs the
        * family thirty days, so the club is named in the prompt and the action is theirs to take.
        */
       Alert.alert(
         "Coach: confirm drop-in",
-        `Record ${card.name}'s free drop-in at ${PARTNER_CLUBS[0]}? This uses their one visit for the next 30 days.`,
+        `Record ${card.name}'s free drop-in at ${club.clubName}? This uses their one visit there for the next 30 days.`,
         [
           { text: "Cancel", style: "cancel" },
           {
             text: "Confirm",
             onPress: async () => {
-              setSaving(card.athleteId)
+              setSaving(`${card.athleteId}:${club.clubId}`)
               try {
-                await recordDropIn(card.athleteId, PARTNER_CLUBS[0])
+                await recordDropIn(card.athleteId, club.clubId)
                 await load()
               } catch (e) {
                 Alert.alert("Not recorded", e instanceof Error ? e.message : "Try again.")
@@ -102,7 +99,7 @@ export default function MembershipCardScreen() {
               <Ionicons name="card-outline" size={40} color={colors.textMuted} />
               <Text style={styles.emptyTitle}>No Blue membership</Text>
               <Text style={styles.emptyBody}>
-                NC United Blue members get a free drop-in each month at partner clubs. Ask us about joining.
+                NC United Blue members get a free drop-in each month at every partner club. Ask us about joining.
               </Text>
             </View>
           ) : null}
@@ -145,36 +142,40 @@ export default function MembershipCardScreen() {
 
                 {card.staleWarning ? <Text style={styles.stale}>{card.staleWarning}</Text> : null}
 
-                <View style={[styles.dropIn, card.dropInEligible ? styles.dropInOpen : styles.dropInClosed]}>
-                  <Ionicons
-                    name={card.dropInEligible ? "checkmark-circle" : "time-outline"}
-                    size={22}
-                    color={card.dropInEligible ? colors.success : colors.textSecondary}
-                  />
-                  <View style={styles.dropInText}>
-                    <Text style={styles.dropInTitle}>
-                      {card.dropInEligible ? "Free drop-in available" : "Drop-in used"}
-                    </Text>
-                    <Text style={styles.dropInBody}>
-                      {card.dropInEligible
-                        ? `One free session at ${PARTNER_CLUBS[0]}`
-                        : `Next free drop-in ${formatDate(card.dropInAvailableFrom)}`}
-                    </Text>
-                  </View>
-                </View>
+                {/* One row per partner club: each club's free session stands on its own. */}
+                {card.dropIns.map((club) => {
+                  const busy = saving === `${card.athleteId}:${club.clubId}`
+                  return (
+                    <View key={club.clubId} style={styles.clubBlock}>
+                      <View style={[styles.dropIn, club.eligible ? styles.dropInOpen : styles.dropInClosed]}>
+                        <Ionicons
+                          name={club.eligible ? "checkmark-circle" : "time-outline"}
+                          size={22}
+                          color={club.eligible ? colors.success : colors.textSecondary}
+                        />
+                        <View style={styles.dropInText}>
+                          <Text style={styles.dropInTitle}>{club.clubName}</Text>
+                          <Text style={styles.dropInBody}>
+                            {club.eligible
+                              ? "Free drop-in available"
+                              : `Next free drop-in ${formatDate(club.availableFrom)}`}
+                          </Text>
+                        </View>
+                      </View>
 
-                {card.dropInEligible ? (
-                  <Pressable
-                    style={styles.tap}
-                    onPress={() => claim(card)}
-                    disabled={saving === card.athleteId}
-                    accessibilityRole="button"
-                  >
-                    <Text style={styles.tapText}>
-                      {saving === card.athleteId ? "Recording…" : "Coach: tap to check in"}
-                    </Text>
-                  </Pressable>
-                ) : null}
+                      {club.eligible ? (
+                        <Pressable
+                          style={styles.tap}
+                          onPress={() => claim(card, club)}
+                          disabled={busy}
+                          accessibilityRole="button"
+                        >
+                          <Text style={styles.tapText}>{busy ? "Recording…" : "Coach: tap to check in"}</Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  )
+                })}
               </View>
             )
           })}
@@ -220,6 +221,7 @@ const styles = StyleSheet.create({
   clock: { ...type.label, color: colors.textMuted, textAlign: "center" },
   stale: { ...type.label, color: colors.warning, textAlign: "center" },
 
+  clubBlock: { gap: space.sm },
   dropIn: {
     flexDirection: "row",
     alignItems: "center",

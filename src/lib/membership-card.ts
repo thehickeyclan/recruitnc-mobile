@@ -3,6 +3,15 @@ import { clientHeader } from "@/lib/client-header"
 
 const BASE = process.env.EXPO_PUBLIC_WEB_BASE_URL
 
+/** One partner club's standing. The window is counted per club, not across all of them. */
+export type PartnerDropIn = {
+  clubId: string
+  clubName: string
+  eligible: boolean
+  availableFrom: string | null
+  lastVisitAt: string | null
+}
+
 export type MembershipCard = {
   athleteId: string
   name: string
@@ -10,9 +19,8 @@ export type MembershipCard = {
   graduationYear: number | null
   status: "active" | "paused" | "inactive"
   memberSince: string | null
-  dropInEligible: boolean
-  dropInAvailableFrom: string | null
-  lastDropIn: { checkedInAt: string; clubName: string } | null
+  /** Sent by the server, so a new partner club appears without an App Store release. */
+  dropIns: PartnerDropIn[]
   staleWarning: string | null
 }
 
@@ -44,11 +52,11 @@ export async function fetchMembershipCards(): Promise<MembershipCard[]> {
 }
 
 /** Records a drop-in. Called when a partner club's coach taps the card in front of them. */
-export async function recordDropIn(athleteId: string, clubName: string): Promise<void> {
+export async function recordDropIn(athleteId: string, clubId: string): Promise<void> {
   const res = await fetch(`${BASE}/api/blue/drop-in-checkin`, {
     method: "POST",
     headers: await authHeaders(),
-    body: JSON.stringify({ athleteId, clubName }),
+    body: JSON.stringify({ athleteId, clubId }),
   })
   if (!res.ok) {
     const data = (await res.json().catch(() => ({}))) as { error?: string }
