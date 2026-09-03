@@ -11,6 +11,19 @@ function formatDate(iso: string | null): string {
   return new Date(iso).toLocaleDateString(undefined, { month: "long", day: "numeric" })
 }
 
+/** A labelled line on the card. Absent facts are left off rather than shown as a blank. */
+function Field({ label, value }: { label: string; value: string | null }) {
+  if (!value) return null
+  return (
+    <View style={styles.field}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <Text style={styles.fieldValue} numberOfLines={1}>
+        {value}
+      </Text>
+    </View>
+  )
+}
+
 function formatMonthYear(iso: string | null): string {
   if (!iso) return ""
   return new Date(iso).toLocaleDateString(undefined, { month: "long", year: "numeric" })
@@ -117,22 +130,31 @@ export default function MembershipCardScreen() {
                   </View>
                 </View>
 
+                {/* Laid out as a credential: portrait photo, then the fields a coach reads. */}
                 <View style={styles.identity}>
                   {card.photoUrl ? (
                     <Image source={{ uri: card.photoUrl }} style={styles.photo} />
                   ) : (
                     <View style={[styles.photo, styles.photoEmpty]}>
-                      <Ionicons name="person" size={26} color={colors.textMuted} />
+                      <Ionicons name="person" size={44} color={colors.textMuted} />
                     </View>
                   )}
                   <View style={styles.identityText}>
-                    <Text style={styles.name}>{card.name}</Text>
-                    {card.graduationYear ? <Text style={styles.meta}>Class of {card.graduationYear}</Text> : null}
-                    {card.memberSince ? (
-                      <Text style={styles.meta}>Member since {formatMonthYear(card.memberSince)}</Text>
-                    ) : null}
+                    <Text style={styles.name} numberOfLines={2}>
+                      {card.name}
+                    </Text>
+                    <Field label="SCHOOL" value={card.highSchool} />
+                    <Field label="CLUB" value={card.club} />
+                    <Field label="CLASS OF" value={card.graduationYear ? String(card.graduationYear) : null} />
                   </View>
                 </View>
+
+                {card.memberSince ? (
+                  <View style={styles.sinceRow}>
+                    <Text style={styles.sinceLabel}>MEMBER SINCE</Text>
+                    <Text style={styles.sinceValue}>{formatMonthYear(card.memberSince)}</Text>
+                  </View>
+                ) : null}
 
                 {/* The moving clock is what makes a screenshot useless. */}
                 <Text style={styles.clock}>
@@ -211,12 +233,32 @@ const styles = StyleSheet.create({
   pillTextLive: { color: colors.ink },
   pillTextOff: { color: colors.textSecondary },
 
-  identity: { flexDirection: "row", gap: space.md, alignItems: "center" },
-  photo: { width: 64, height: 64, borderRadius: radius.md, backgroundColor: colors.surface },
+  identity: { flexDirection: "row", gap: space.lg, alignItems: "flex-start" },
+  photo: {
+    width: 96,
+    height: 120,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.line,
+  },
   photoEmpty: { alignItems: "center", justifyContent: "center" },
-  identityText: { flex: 1, gap: 2 },
+  identityText: { flex: 1, gap: space.sm },
   name: { ...type.title, color: colors.text },
-  meta: { ...type.label, color: colors.textSecondary },
+  field: { gap: 1 },
+  fieldLabel: { ...type.caption, color: colors.textMuted, fontSize: 9 },
+  fieldValue: { ...type.body, color: colors.text },
+
+  sinceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderTopWidth: 1,
+    borderTopColor: colors.line,
+    paddingTop: space.md,
+  },
+  sinceLabel: { ...type.caption, color: colors.textMuted, fontSize: 9 },
+  sinceValue: { ...type.label, color: colors.textSecondary },
 
   clock: { ...type.label, color: colors.textMuted, textAlign: "center" },
   stale: { ...type.label, color: colors.warning, textAlign: "center" },

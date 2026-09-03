@@ -17,6 +17,8 @@ export type MembershipCard = {
   name: string
   photoUrl: string | null
   graduationYear: number | null
+  highSchool: string | null
+  club: string | null
   status: "active" | "paused" | "inactive"
   memberSince: string | null
   /** Sent by the server, so a new partner club appears without an App Store release. */
