@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react"
-import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native"
+import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { Stack } from "expo-router"
 import Ionicons from "@expo/vector-icons/Ionicons"
@@ -20,6 +20,86 @@ function Field({ label, value }: { label: string; value: string | null }) {
       <Text style={styles.fieldValue} numberOfLines={1}>
         {value}
       </Text>
+    </View>
+  )
+}
+
+/**
+ * The drop-in control: pick a club, then one button.
+ *
+ * A row per club worked with one partner and would not with five. The picker keeps the card the
+ * same height however many clubs are added, and only appears when there is a choice to make.
+ */
+function DropInSection({
+  card,
+  busyKey,
+  onClaim,
+}: {
+  card: MembershipCard
+  busyKey: string | null
+  onClaim: (club: PartnerDropIn) => void
+}) {
+  const [selectedId, setSelectedId] = useState(card.dropIns[0]?.clubId ?? "")
+  const club = card.dropIns.find((d) => d.clubId === selectedId) ?? card.dropIns[0] ?? null
+  if (!club) return null
+
+  const busy = busyKey === `${card.athleteId}:${club.clubId}`
+  const membershipInactive = card.status !== "active"
+
+  /** Say why the button is unavailable. A blank date was the worst of both. */
+  const reason = membershipInactive
+    ? card.status === "paused"
+      ? "Membership paused — drop-ins resume when it does"
+      : "Membership inactive — renew to use drop-ins"
+    : club.availableFrom
+      ? `Used here. Next free drop-in ${formatDate(club.availableFrom)}`
+      : null
+
+  return (
+    <View style={styles.dropInSection}>
+      <Text style={styles.dropInHeading}>FREE DROP-IN</Text>
+
+      {card.dropIns.length > 1 ? (
+        <View style={styles.clubPicker}>
+          {card.dropIns.map((option) => {
+            const on = option.clubId === club.clubId
+            return (
+              <Pressable
+                key={option.clubId}
+                onPress={() => setSelectedId(option.clubId)}
+                style={[styles.clubChip, on && styles.clubChipOn]}
+                accessibilityRole="button"
+              >
+                <Text style={[styles.clubChipText, on && styles.clubChipTextOn]} numberOfLines={1}>
+                  {option.clubName}
+                </Text>
+              </Pressable>
+            )
+          })}
+        </View>
+      ) : (
+        <Text style={styles.singleClub}>{club.clubName}</Text>
+      )}
+
+      <View style={[styles.dropIn, club.eligible ? styles.dropInOpen : styles.dropInClosed]}>
+        <Ionicons
+          name={club.eligible ? "checkmark-circle" : "time-outline"}
+          size={22}
+          color={club.eligible ? colors.success : colors.textSecondary}
+        />
+        <Text style={styles.dropInBody}>{club.eligible ? "Available now" : reason}</Text>
+      </View>
+
+      <Pressable
+        style={[styles.tap, !club.eligible && styles.tapOff]}
+        onPress={() => onClaim(club)}
+        disabled={!club.eligible || busy}
+        accessibilityRole="button"
+      >
+        <Text style={[styles.tapText, !club.eligible && styles.tapTextOff]}>
+          {busy ? "Recording…" : "Coach: tap to check in"}
+        </Text>
+      </Pressable>
     </View>
   )
 }
@@ -49,6 +129,8 @@ export default function MembershipCardScreen() {
   const [cards, setCards] = useState<MembershipCard[] | null>(null)
   const [error, setError] = useState("")
   const [saving, setSaving] = useState<string | null>(null)
+  const [page, setPage] = useState(0)
+  const { width } = useWindowDimensions()
   const now = useNow()
 
   const load = useCallback(async () => {
@@ -97,111 +179,96 @@ export default function MembershipCardScreen() {
   )
 
   return (
-    <SafeAreaView style={styles.screen} edges={["bottom"]}>
+    <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
       <Stack.Screen options={{ title: "Membership" }} />
       {cards === null ? (
         <View style={styles.centre}>
           <ActivityIndicator color={colors.gold} />
         </View>
-      ) : (
-        <ScrollView contentContainerStyle={styles.content}>
+      ) : cards.length === 0 ? (
+        <View style={styles.empty}>
           {error ? <Text style={styles.error}>{error}</Text> : null}
+          <Ionicons name="card-outline" size={40} color={colors.textMuted} />
+          <Text style={styles.emptyTitle}>No Blue membership</Text>
+          <Text style={styles.emptyBody}>
+            NC United Blue members get a free drop-in each month at every partner club. Ask us about joining.
+          </Text>
+        </View>
+      ) : (
+        <>
+          {/* One card per screen, swiped between. It is held up at a door, so it fills the screen. */}
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={(e) => setPage(Math.round(e.nativeEvent.contentOffset.x / width))}
+            style={styles.pager}
+          >
+            {cards.map((card) => {
+              const live = card.status === "active"
+              return (
+                <View key={card.athleteId} style={[styles.page, { width }]}>
+                  <View style={styles.card}>
+                    <View style={styles.cardHead}>
+                      <Text style={styles.brand}>NC UNITED BLUE</Text>
+                      <View style={[styles.pill, live ? styles.pillLive : styles.pillOff]}>
+                        <Text style={[styles.pillText, live ? styles.pillTextLive : styles.pillTextOff]}>
+                          {card.status === "active" ? "ACTIVE" : card.status === "paused" ? "PAUSED" : "INACTIVE"}
+                        </Text>
+                      </View>
+                    </View>
 
-          {cards.length === 0 && !error ? (
-            <View style={styles.empty}>
-              <Ionicons name="card-outline" size={40} color={colors.textMuted} />
-              <Text style={styles.emptyTitle}>No Blue membership</Text>
-              <Text style={styles.emptyBody}>
-                NC United Blue members get a free drop-in each month at every partner club. Ask us about joining.
-              </Text>
+                    {/* Laid out as a credential: portrait photo, then the fields a coach reads. */}
+                    <View style={styles.identity}>
+                      {card.photoUrl ? (
+                        <Image source={{ uri: card.photoUrl }} style={styles.photo} />
+                      ) : (
+                        <View style={[styles.photo, styles.photoEmpty]}>
+                          <Ionicons name="person" size={56} color={colors.textMuted} />
+                        </View>
+                      )}
+                      <View style={styles.identityText}>
+                        <Text style={styles.name} numberOfLines={2}>
+                          {card.name}
+                        </Text>
+                        <Field label="SCHOOL" value={card.highSchool} />
+                        <Field label="CLUB" value={card.club} />
+                        <Field label="CLASS OF" value={card.graduationYear ? String(card.graduationYear) : null} />
+                      </View>
+                    </View>
+
+                    {card.memberSince ? (
+                      <View style={styles.sinceRow}>
+                        <Text style={styles.sinceLabel}>MEMBER SINCE</Text>
+                        <Text style={styles.sinceValue}>{formatMonthYear(card.memberSince)}</Text>
+                      </View>
+                    ) : null}
+
+                    {/* The moving clock is what makes a screenshot useless. */}
+                    <Text style={styles.clock}>
+                      {now.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })} ·{" "}
+                      {now.toLocaleTimeString()}
+                    </Text>
+
+                    {card.staleWarning ? <Text style={styles.stale}>{card.staleWarning}</Text> : null}
+
+                    <View style={styles.spacer} />
+
+                    <DropInSection card={card} busyKey={saving} onClaim={(club) => claim(card, club)} />
+                  </View>
+                </View>
+              )
+            })}
+          </ScrollView>
+
+          {cards.length > 1 ? (
+            <View style={styles.dots}>
+              {cards.map((card, i) => (
+                <View key={card.athleteId} style={[styles.dot, i === page && styles.dotOn]} />
+              ))}
             </View>
           ) : null}
-
-          {cards.map((card) => {
-            const live = card.status === "active"
-            return (
-              <View key={card.athleteId} style={styles.card}>
-                <View style={styles.cardHead}>
-                  <Text style={styles.brand}>NC UNITED BLUE</Text>
-                  <View style={[styles.pill, live ? styles.pillLive : styles.pillOff]}>
-                    <Text style={[styles.pillText, live ? styles.pillTextLive : styles.pillTextOff]}>
-                      {card.status === "active" ? "ACTIVE" : card.status === "paused" ? "PAUSED" : "INACTIVE"}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Laid out as a credential: portrait photo, then the fields a coach reads. */}
-                <View style={styles.identity}>
-                  {card.photoUrl ? (
-                    <Image source={{ uri: card.photoUrl }} style={styles.photo} />
-                  ) : (
-                    <View style={[styles.photo, styles.photoEmpty]}>
-                      <Ionicons name="person" size={44} color={colors.textMuted} />
-                    </View>
-                  )}
-                  <View style={styles.identityText}>
-                    <Text style={styles.name} numberOfLines={2}>
-                      {card.name}
-                    </Text>
-                    <Field label="SCHOOL" value={card.highSchool} />
-                    <Field label="CLUB" value={card.club} />
-                    <Field label="CLASS OF" value={card.graduationYear ? String(card.graduationYear) : null} />
-                  </View>
-                </View>
-
-                {card.memberSince ? (
-                  <View style={styles.sinceRow}>
-                    <Text style={styles.sinceLabel}>MEMBER SINCE</Text>
-                    <Text style={styles.sinceValue}>{formatMonthYear(card.memberSince)}</Text>
-                  </View>
-                ) : null}
-
-                {/* The moving clock is what makes a screenshot useless. */}
-                <Text style={styles.clock}>
-                  {now.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })} ·{" "}
-                  {now.toLocaleTimeString()}
-                </Text>
-
-                {card.staleWarning ? <Text style={styles.stale}>{card.staleWarning}</Text> : null}
-
-                {/* One row per partner club: each club's free session stands on its own. */}
-                {card.dropIns.map((club) => {
-                  const busy = saving === `${card.athleteId}:${club.clubId}`
-                  return (
-                    <View key={club.clubId} style={styles.clubBlock}>
-                      <View style={[styles.dropIn, club.eligible ? styles.dropInOpen : styles.dropInClosed]}>
-                        <Ionicons
-                          name={club.eligible ? "checkmark-circle" : "time-outline"}
-                          size={22}
-                          color={club.eligible ? colors.success : colors.textSecondary}
-                        />
-                        <View style={styles.dropInText}>
-                          <Text style={styles.dropInTitle}>{club.clubName}</Text>
-                          <Text style={styles.dropInBody}>
-                            {club.eligible
-                              ? "Free drop-in available"
-                              : `Next free drop-in ${formatDate(club.availableFrom)}`}
-                          </Text>
-                        </View>
-                      </View>
-
-                      {club.eligible ? (
-                        <Pressable
-                          style={styles.tap}
-                          onPress={() => claim(card, club)}
-                          disabled={busy}
-                          accessibilityRole="button"
-                        >
-                          <Text style={styles.tapText}>{busy ? "Recording…" : "Coach: tap to check in"}</Text>
-                        </Pressable>
-                      ) : null}
-                    </View>
-                  )
-                })}
-              </View>
-            )
-          })}
-        </ScrollView>
+        </>
       )}
     </SafeAreaView>
   )
@@ -210,13 +277,19 @@ export default function MembershipCardScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.ink },
   centre: { flex: 1, alignItems: "center", justifyContent: "center" },
-  content: { padding: space.lg, gap: space.lg },
+  pager: { flex: 1 },
+  page: { padding: space.lg },
+  spacer: { flex: 1 },
+  dots: { flexDirection: "row", justifyContent: "center", gap: space.sm, paddingBottom: space.md },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.line },
+  dotOn: { backgroundColor: colors.gold },
   error: { ...type.body, color: colors.red, textAlign: "center" },
-  empty: { alignItems: "center", gap: space.sm, paddingVertical: space.xxl },
+  empty: { flex: 1, alignItems: "center", justifyContent: "center", gap: space.sm, padding: space.xl },
   emptyTitle: { ...type.title, color: colors.text },
   emptyBody: { ...type.body, color: colors.textSecondary, textAlign: "center", paddingHorizontal: space.lg },
 
   card: {
+    flex: 1,
     backgroundColor: colors.raised,
     borderRadius: radius.lg,
     borderWidth: 1,
@@ -235,8 +308,8 @@ const styles = StyleSheet.create({
 
   identity: { flexDirection: "row", gap: space.lg, alignItems: "flex-start" },
   photo: {
-    width: 96,
-    height: 120,
+    width: 120,
+    height: 150,
     borderRadius: radius.sm,
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -263,7 +336,21 @@ const styles = StyleSheet.create({
   clock: { ...type.label, color: colors.textMuted, textAlign: "center" },
   stale: { ...type.label, color: colors.warning, textAlign: "center" },
 
-  clubBlock: { gap: space.sm },
+  dropInSection: { gap: space.sm },
+  dropInHeading: { ...type.caption, color: colors.textMuted, fontSize: 9 },
+  singleClub: { ...type.heading, color: colors.text },
+  clubPicker: { flexDirection: "row", flexWrap: "wrap", gap: space.sm },
+  clubChip: {
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface,
+  },
+  clubChipOn: { borderColor: colors.gold, backgroundColor: "rgba(211,181,116,0.14)" },
+  clubChipText: { ...type.label, color: colors.textSecondary },
+  clubChipTextOn: { color: colors.gold },
   dropIn: {
     flexDirection: "row",
     alignItems: "center",
@@ -274,9 +361,7 @@ const styles = StyleSheet.create({
   },
   dropInOpen: { backgroundColor: "rgba(63,178,127,0.12)", borderColor: "rgba(63,178,127,0.4)" },
   dropInClosed: { backgroundColor: colors.surface, borderColor: colors.line },
-  dropInText: { flex: 1, gap: 2 },
-  dropInTitle: { ...type.heading, color: colors.text },
-  dropInBody: { ...type.label, color: colors.textSecondary },
+  dropInBody: { ...type.label, color: colors.textSecondary, flex: 1 },
 
   tap: {
     backgroundColor: colors.gold,
@@ -284,5 +369,7 @@ const styles = StyleSheet.create({
     paddingVertical: space.md,
     alignItems: "center",
   },
+  tapOff: { backgroundColor: colors.surface },
   tapText: { ...type.heading, color: colors.ink },
+  tapTextOff: { color: colors.textMuted },
 })
