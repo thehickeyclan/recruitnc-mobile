@@ -167,6 +167,18 @@ export default function MoreScreen() {
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </Pressable>
+          {signedIn ? (
+            <>
+              <View style={styles.rowDivider} />
+              <Pressable style={styles.row} onPress={() => router.push("/blue-subscription")}>
+                <View style={styles.rowBody}>
+                  <Text style={styles.rowTitle}>Manage subscription</Text>
+                  <Text style={styles.rowDetail}>Status, next bill date, payment method, invoices, and cancellation</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+              </Pressable>
+            </>
+          ) : null}
         </View>
 
         <Text style={styles.sectionHeading}>FIND A CLUB</Text>
