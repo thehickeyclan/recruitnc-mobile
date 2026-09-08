@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react"
 import AsyncStorage from "@react-native-async-storage/async-storage"
-import { DEFAULT_PREFS, PushUnavailableError, registerForPush, syncDevice, type AlertPrefs } from "@/lib/push"
+import { DEFAULT_PREFS, PushUnavailableError, registerForPush, syncDevice, withAlertDefaults, type AlertPrefs } from "@/lib/push"
 
 /**
  * Alert preferences, shared by every screen that shows a toggle.
@@ -35,7 +35,7 @@ export function useAlertPrefs(): AlertPrefsState {
       if (!raw) return
       try {
         const saved = JSON.parse(raw) as { prefs: AlertPrefs; enabled: boolean }
-        setPrefs(saved.prefs ?? DEFAULT_PREFS)
+        setPrefs(withAlertDefaults(saved.prefs))
         setEnabled(Boolean(saved.enabled))
       } catch {
         // A corrupt blob should not stop the screen rendering — defaults are correct enough.

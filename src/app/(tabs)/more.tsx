@@ -6,7 +6,7 @@ import * as WebBrowser from "expo-web-browser"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors, radius, space, type } from "@/theme/tokens"
 import { router } from "expo-router"
-import { DEFAULT_PREFS, PushUnavailableError, registerForPush, syncDevice, type AlertPrefs } from "@/lib/push"
+import { DEFAULT_PREFS, PushUnavailableError, registerForPush, syncDevice, withAlertDefaults, type AlertPrefs } from "@/lib/push"
 import { deleteAccount, signOut, useSession } from "@/lib/auth"
 
 const PREFS_KEY = "recruitnc.alertPrefs"
@@ -36,7 +36,7 @@ export default function MoreScreen() {
       if (!raw) return
       try {
         const saved = JSON.parse(raw) as { prefs: AlertPrefs; enabled: boolean }
-        setPrefs(saved.prefs ?? DEFAULT_PREFS)
+        setPrefs(withAlertDefaults(saved.prefs))
         setEnabled(Boolean(saved.enabled))
       } catch {
         // stored value unreadable — fall back to defaults

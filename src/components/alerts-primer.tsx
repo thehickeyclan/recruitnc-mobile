@@ -1,11 +1,20 @@
 import { useCallback, useEffect, useState } from "react"
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from "react-native"
 import AsyncStorage from "@react-native-async-storage/async-storage"
+import * as Notifications from "expo-notifications"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors, radius, space, type } from "@/theme/tokens"
-import { DEFAULT_PREFS, PushUnavailableError, registerForPush, syncDevice } from "@/lib/push"
+import {
+  DEFAULT_PREFS,
+  PushUnavailableError,
+  registerForPush,
+  syncDevice,
+  withAlertDefaults,
+  type AlertPrefs,
+} from "@/lib/push"
 
 const PRIMED_KEY = "recruitnc.alertsPrimed"
+const PREFS_KEY = "recruitnc.alertPrefs"
 
 /** Let the first screen paint before asking for anything. */
 const APPEAR_DELAY_MS = 1200
@@ -29,9 +38,37 @@ export function AlertsPrimer() {
   useEffect(() => {
     let cancelled = false
     const timer = setTimeout(() => {
-      void AsyncStorage.getItem(PRIMED_KEY).then((seen) => {
-        if (!cancelled && !seen) setVisible(true)
-      })
+      void Promise.all([AsyncStorage.getItem(PRIMED_KEY), AsyncStorage.getItem(PREFS_KEY)]).then(
+        async ([seen, rawPrefs]) => {
+          if (cancelled) return
+          if (!seen) {
+            setVisible(true)
+            return
+          }
+
+          let saved: { prefs?: Partial<AlertPrefs>; enabled?: boolean } | null = null
+          try {
+            saved = rawPrefs ? JSON.parse(rawPrefs) : null
+          } catch {
+            saved = null
+          }
+
+          const prefs = withAlertDefaults(saved?.prefs)
+          const permission = await Notifications.getPermissionsAsync()
+          // Older builds registered from this primer without saving PREFS_KEY. Restore that
+          // prior choice only when iOS confirms notifications were already granted.
+          const enabled = saved?.enabled === true || (!rawPrefs && permission.status === "granted")
+          if (!enabled || cancelled) return
+
+          await AsyncStorage.setItem(PREFS_KEY, JSON.stringify({ prefs, enabled: true }))
+          try {
+            const token = await registerForPush()
+            await syncDevice(token, prefs)
+          } catch {
+            // A transient offline launch must not erase the user's saved alert choice.
+          }
+        },
+      )
     }, APPEAR_DELAY_MS)
     return () => {
       cancelled = true
@@ -53,6 +90,7 @@ export function AlertsPrimer() {
     try {
       const token = await registerForPush()
       await syncDevice(token, DEFAULT_PREFS)
+      await AsyncStorage.setItem(PREFS_KEY, JSON.stringify({ prefs: DEFAULT_PREFS, enabled: true }))
       await close()
     } catch (e) {
       // Surface the reason rather than a dead button — "needs a real device" and "you turned

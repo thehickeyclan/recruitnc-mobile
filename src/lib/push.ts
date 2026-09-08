@@ -30,6 +30,11 @@ export const DEFAULT_PREFS: AlertPrefs = {
   news: true,
 }
 
+/** Merge older saved shapes over today's defaults so upgrades do not disable new alerts. */
+export function withAlertDefaults(saved?: Partial<AlertPrefs> | null): AlertPrefs {
+  return { ...DEFAULT_PREFS, ...(saved ?? {}) }
+}
+
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowBanner: true,
