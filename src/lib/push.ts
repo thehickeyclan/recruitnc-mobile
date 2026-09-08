@@ -12,6 +12,8 @@ export type AlertPrefs = {
   events: boolean
   toc: boolean
   news: boolean
+  /** Day-before reminders for the college teams this device follows. */
+  college: boolean
 }
 
 /**
@@ -28,6 +30,11 @@ export const DEFAULT_PREFS: AlertPrefs = {
   events: false,
   toc: true,
   news: true,
+  // On, unlike practice reminders, and for the opposite reason: `events` fires the day before
+  // every event on the calendar, while a college reminder only ever concerns a team this device
+  // went and chose. Defaulting it off would mean following a team and then hunting for a switch
+  // to hear about it.
+  college: true,
 }
 
 /** Merge older saved shapes over today's defaults so upgrades do not disable new alerts. */

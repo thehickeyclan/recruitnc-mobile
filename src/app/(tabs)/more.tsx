@@ -22,6 +22,13 @@ const ALERTS: { key: keyof AlertPrefs; title: string; detail: string }[] = [
     detail: "The moment a weight class field is released",
   },
   { key: "events", title: "Calendar reminders", detail: "The day before practices and events" },
+  {
+    key: "college",
+    title: "College teams you follow",
+    // Named for the follow rather than for colleges in general: this fires only for teams
+    // chosen on the calendar, which is why it can default on where calendar reminders cannot.
+    detail: "The day before a team you follow wrestles",
+  },
 ]
 
 export default function MoreScreen() {

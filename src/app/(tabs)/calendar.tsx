@@ -6,6 +6,7 @@ import * as WebBrowser from "expo-web-browser"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors, radius, space, type } from "@/theme/tokens"
 import { eventCoversDate, fetchAllEvents, formatTime, type CalendarEvent } from "@/lib/events"
+import { useCollegeFollows } from "@/lib/use-college-follows"
 import { MonthGrid } from "@/components/month-grid"
 
 function DateBlock({ iso }: { iso: string }) {
@@ -75,7 +76,10 @@ function EventCard({ event }: { event: CalendarEvent }) {
 }
 
 export default function CalendarScreen() {
-  const [events, setEvents] = useState<CalendarEvent[]>([])
+  const [ncEvents, setNcEvents] = useState<CalendarEvent[]>([])
+  const [teamPickerOpen, setTeamPickerOpen] = useState(false)
+  /** Followed college teams. Nothing is drawn until one is chosen. */
+  const college = useCollegeFollows()
   // Month is the default here to match the website's calendar, which opens on the grid.
   const [view, setView] = useState<"month" | "list">("month")
   const now = new Date()
@@ -88,7 +92,7 @@ export default function CalendarScreen() {
   const load = useCallback(async () => {
     try {
       setError(null)
-      setEvents(await fetchAllEvents())
+      setNcEvents(await fetchAllEvents())
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load the calendar")
     }
@@ -99,6 +103,17 @@ export default function CalendarScreen() {
   }, [load])
 
   const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
+
+  /**
+   * NC events plus whatever college teams are followed, in one list.
+   *
+   * Merged rather than kept in a second tab so a college dual lands on its own square of the
+   * month grid, next to everything else happening that day.
+   */
+  const events = useMemo(
+    () => [...ncEvents, ...college.events].sort((a, b) => a.startDate.localeCompare(b.startDate)),
+    [ncEvents, college.events],
+  )
 
   const upcoming = useMemo(
     () => events.filter((e) => (e.endDate && e.endDate >= e.startDate ? e.endDate : e.startDate) >= todayIso),
@@ -152,6 +167,66 @@ export default function CalendarScreen() {
                 </Pressable>
               ))}
             </View>
+          </View>
+        ) : null}
+
+        {/*
+          Following a college team. Collapsed by default and empty until somebody opens it —
+          twelve programs at roughly twenty dates each would bury the NC events this calendar
+          exists for, so the choice is the whole gate.
+        */}
+        {!loading && !error && college.ready && college.teams.length ? (
+          <View style={styles.collegeBar}>
+            <Pressable
+              onPress={() => setTeamPickerOpen((open) => !open)}
+              accessibilityRole="button"
+              style={styles.collegeToggle}
+            >
+              <Ionicons name="school-outline" size={14} color={colors.textMuted} />
+              <Text style={styles.collegeToggleText}>
+                {college.followed.length
+                  ? `Following ${college.followed.length} college ${college.followed.length === 1 ? "team" : "teams"}`
+                  : "Follow a college team"}
+              </Text>
+              <Ionicons
+                name={teamPickerOpen ? "chevron-up" : "chevron-down"}
+                size={14}
+                color={colors.textMuted}
+              />
+            </Pressable>
+
+            {teamPickerOpen ? (
+              <View style={styles.teamList}>
+                {college.teams.map((team) => {
+                  const following = college.followed.includes(team.id)
+                  return (
+                    <Pressable
+                      key={team.id}
+                      onPress={() => void college.toggle(team.id)}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: following }}
+                      style={[styles.teamRow, following && styles.teamRowActive]}
+                    >
+                      <View style={styles.teamNames}>
+                        <Text style={[styles.teamName, following && styles.teamNameActive]}>{team.name}</Text>
+                        {team.division ? <Text style={styles.teamDivision}>{team.division}</Text> : null}
+                      </View>
+                      <Ionicons
+                        name={following ? "checkmark-circle" : "add-circle-outline"}
+                        size={20}
+                        color={following ? colors.gold : colors.textMuted}
+                      />
+                    </Pressable>
+                  )
+                })}
+              </View>
+            ) : null}
+
+            {college.notice ? (
+              <Pressable onPress={() => college.setNotice(null)}>
+                <Text style={styles.collegeNotice}>{college.notice}</Text>
+              </Pressable>
+            ) : null}
           </View>
         ) : null}
       </View>
@@ -242,6 +317,33 @@ const styles = StyleSheet.create({
   toggleText: { ...type.caption, color: colors.textMuted, fontSize: 10 },
   toggleTextActive: { color: colors.ink },
   hint: { ...type.label, color: colors.textMuted, textAlign: "center", paddingVertical: space.xl },
+  collegeBar: { marginTop: space.md, gap: space.sm },
+  collegeToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.sm,
+    paddingVertical: space.sm,
+    paddingHorizontal: space.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.line,
+  },
+  collegeToggleText: { ...type.label, color: colors.textSecondary, flex: 1 },
+  teamList: { gap: 2 },
+  teamRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: space.sm,
+    paddingHorizontal: space.md,
+    borderRadius: radius.md,
+  },
+  teamRowActive: { backgroundColor: colors.surface },
+  teamNames: { flex: 1 },
+  teamName: { ...type.body, color: colors.textSecondary },
+  teamNameActive: { color: colors.text },
+  teamDivision: { ...type.caption, color: colors.textMuted },
+  collegeNotice: { ...type.caption, color: colors.gold, paddingHorizontal: space.md },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: space.md },
   error: { ...type.body, color: colors.textSecondary, paddingHorizontal: space.xl, textAlign: "center" },
   list: { paddingHorizontal: space.lg, paddingBottom: space.xxl, gap: space.md },
