@@ -12,6 +12,7 @@ import {
   withAlertDefaults,
   type AlertPrefs,
 } from "@/lib/push"
+import { trackPushEvent } from "@/lib/push-telemetry"
 
 const PRIMED_KEY = "recruitnc.alertsPrimed"
 const PREFS_KEY = "recruitnc.alertPrefs"
@@ -42,6 +43,9 @@ export function AlertsPrimer() {
         async ([seen, rawPrefs]) => {
           if (cancelled) return
           if (!seen) {
+            const permission = await Notifications.getPermissionsAsync()
+            void trackPushEvent("app_launch", false, { primed: false })
+            void trackPushEvent(permission.status === "granted" ? "permission_granted" : "permission_denied", false)
             setVisible(true)
             return
           }
@@ -58,13 +62,17 @@ export function AlertsPrimer() {
           // Older builds registered from this primer without saving PREFS_KEY. Restore that
           // prior choice only when iOS confirms notifications were already granted.
           const enabled = saved?.enabled === true || (!rawPrefs && permission.status === "granted")
+          void trackPushEvent("app_launch", enabled, { primed: Boolean(seen) })
+          void trackPushEvent(permission.status === "granted" ? "permission_granted" : "permission_denied", enabled)
           if (!enabled || cancelled) return
 
           await AsyncStorage.setItem(PREFS_KEY, JSON.stringify({ prefs, enabled: true }))
           try {
             const token = await registerForPush()
             await syncDevice(token, prefs)
-          } catch {
+            void trackPushEvent("device_registered", true)
+          } catch (error) {
+            void trackPushEvent("registration_failed", true, { message: error instanceof Error ? error.message : "unknown" })
             // A transient offline launch must not erase the user's saved alert choice.
           }
         },
@@ -91,8 +99,11 @@ export function AlertsPrimer() {
       const token = await registerForPush()
       await syncDevice(token, DEFAULT_PREFS)
       await AsyncStorage.setItem(PREFS_KEY, JSON.stringify({ prefs: DEFAULT_PREFS, enabled: true }))
+      void trackPushEvent("alerts_enabled", true)
+      void trackPushEvent("device_registered", true)
       await close()
     } catch (e) {
+      void trackPushEvent("registration_failed", false, { message: e instanceof Error ? e.message : "unknown" })
       // Surface the reason rather than a dead button — "needs a real device" and "you turned
       // notifications off in Settings" are different problems with different fixes.
       setProblem(
