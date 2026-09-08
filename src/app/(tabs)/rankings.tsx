@@ -122,7 +122,8 @@ export default function RankingsScreen() {
   const { signedIn, loading: sessionLoading } = useSession()
   const [classes, setClasses] = useState<RankingClass[]>([])
   const [activeYear, setActiveYear] = useState<number | null>(null)
-  const [gender, setGender] = useState<RankingGender>("male")
+  /** Fixed: RecruitNC publishes boys' rankings only. */
+  const gender: RankingGender = "male"
   const [prospects, setProspects] = useState<RankedProspect[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -154,31 +155,17 @@ export default function RankingsScreen() {
     }
   }, [])
 
-  /** Classes published for the gender being shown. */
-  const shownClasses = useMemo(() => classes.filter((c) => c.gender === gender), [classes, gender])
-
   /**
-   * The Boys/Girls switch appears only once a girls' class is actually published.
-   * An empty tab reads as a broken app rather than as a class that does not exist yet.
+   * Only the boys' classes are published, and there is no plan to publish girls'.
+   * The filter stays so a stray female row could never appear in this list unannounced.
    */
-  const genders = useMemo(() => {
-    const found = new Set(classes.map((c) => c.gender))
-    return found.size > 1 ? (["male", "female"] as RankingGender[]) : []
-  }, [classes])
+  const shownClasses = useMemo(() => classes.filter((c) => c.gender === gender), [classes, gender])
 
   useEffect(() => {
     if (activeYear == null) return
     setLoading(true)
     void load(activeYear, gender).finally(() => setLoading(false))
   }, [activeYear, gender, load])
-
-  // Switching gender can land on a class that side has never published; move to one it has.
-  useEffect(() => {
-    if (!shownClasses.length) return
-    if (!shownClasses.some((c) => c.graduationYear === activeYear)) {
-      setActiveYear(shownClasses[0].graduationYear)
-    }
-  }, [shownClasses, activeYear])
 
   const onRefresh = useCallback(async () => {
     if (activeYear == null) return
@@ -223,27 +210,6 @@ export default function RankingsScreen() {
         <Text style={styles.eyebrow}>RECRUITNC</Text>
         <Text style={styles.title} maxFontSizeMultiplier={1.4}>Rankings</Text>
       </View>
-
-      {genders.length ? (
-        <View style={styles.genderRow}>
-          {genders.map((g) => {
-            const active = g === gender
-            return (
-              <Pressable
-                key={g}
-                onPress={() => setGender(g)}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                style={[styles.genderTab, active && styles.genderTabActive]}
-              >
-                <Text style={[styles.genderText, active && styles.genderTextActive]}>
-                  {g === "male" ? "Boys" : "Girls"}
-                </Text>
-              </Pressable>
-            )
-          })}
-        </View>
-      ) : null}
 
       <ScrollView
         horizontal
@@ -296,17 +262,6 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: space.md },
   eyebrow: { ...type.caption, color: colors.gold, marginBottom: space.xs },
   title: { ...type.display, color: colors.text },
-  genderRow: { flexDirection: "row", gap: space.sm, paddingHorizontal: space.lg, marginBottom: space.md },
-  genderTab: {
-    paddingHorizontal: space.lg,
-    paddingVertical: space.sm,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.line,
-  },
-  genderTabActive: { backgroundColor: colors.gold, borderColor: colors.gold },
-  genderText: { ...type.label, color: colors.textSecondary },
-  genderTextActive: { color: colors.ink },
   chipStrip: { flexGrow: 0, minHeight: 46, marginBottom: space.md },
   chips: { paddingHorizontal: space.lg, gap: space.sm, alignItems: "center" },
   chip: {
