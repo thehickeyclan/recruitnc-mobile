@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   ActivityIndicator,
   FlatList,
@@ -19,6 +19,7 @@ import { openAthleteProfile } from "@/lib/profile-link"
 import {
   fetchRankingClasses,
   fetchRankings,
+  type RankingGender,
   type RankedProspect,
   type RankingClass,
 } from "@/lib/rankings"
@@ -121,6 +122,7 @@ export default function RankingsScreen() {
   const { signedIn, loading: sessionLoading } = useSession()
   const [classes, setClasses] = useState<RankingClass[]>([])
   const [activeYear, setActiveYear] = useState<number | null>(null)
+  const [gender, setGender] = useState<RankingGender>("male")
   const [prospects, setProspects] = useState<RankedProspect[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -135,7 +137,7 @@ export default function RankingsScreen() {
         // The nearest class first — 2027 is the one being recruited now, and the one people
         // open this tab to check. Publication order put whichever class was edited last on
         // top, which is an editing detail, not what a reader wants.
-        setActiveYear(found[0]?.graduationYear ?? null)
+        setActiveYear(found.find((c) => c.gender === "male")?.graduationYear ?? found[0]?.graduationYear ?? null)
       })
       .catch((e) => !cancelled && setError(e instanceof Error ? e.message : "Could not load rankings"))
     return () => {
@@ -143,25 +145,45 @@ export default function RankingsScreen() {
     }
   }, [])
 
-  const load = useCallback(async (year: number) => {
+  const load = useCallback(async (year: number, forGender: RankingGender) => {
     try {
       setError(null)
-      setProspects(await fetchRankings(year))
+      setProspects(await fetchRankings(year, forGender))
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load rankings")
     }
   }, [])
 
+  /** Classes published for the gender being shown. */
+  const shownClasses = useMemo(() => classes.filter((c) => c.gender === gender), [classes, gender])
+
+  /**
+   * The Boys/Girls switch appears only once a girls' class is actually published.
+   * An empty tab reads as a broken app rather than as a class that does not exist yet.
+   */
+  const genders = useMemo(() => {
+    const found = new Set(classes.map((c) => c.gender))
+    return found.size > 1 ? (["male", "female"] as RankingGender[]) : []
+  }, [classes])
+
   useEffect(() => {
     if (activeYear == null) return
     setLoading(true)
-    void load(activeYear).finally(() => setLoading(false))
-  }, [activeYear, load])
+    void load(activeYear, gender).finally(() => setLoading(false))
+  }, [activeYear, gender, load])
+
+  // Switching gender can land on a class that side has never published; move to one it has.
+  useEffect(() => {
+    if (!shownClasses.length) return
+    if (!shownClasses.some((c) => c.graduationYear === activeYear)) {
+      setActiveYear(shownClasses[0].graduationYear)
+    }
+  }, [shownClasses, activeYear])
 
   const onRefresh = useCallback(async () => {
     if (activeYear == null) return
     setRefreshing(true)
-    await load(activeYear)
+    await load(activeYear, gender)
     setRefreshing(false)
   }, [activeYear, load])
 
@@ -202,13 +224,34 @@ export default function RankingsScreen() {
         <Text style={styles.title} maxFontSizeMultiplier={1.4}>Rankings</Text>
       </View>
 
+      {genders.length ? (
+        <View style={styles.genderRow}>
+          {genders.map((g) => {
+            const active = g === gender
+            return (
+              <Pressable
+                key={g}
+                onPress={() => setGender(g)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                style={[styles.genderTab, active && styles.genderTabActive]}
+              >
+                <Text style={[styles.genderText, active && styles.genderTextActive]}>
+                  {g === "male" ? "Boys" : "Girls"}
+                </Text>
+              </Pressable>
+            )
+          })}
+        </View>
+      ) : null}
+
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.chips}
         style={styles.chipStrip}
       >
-        {classes.map((c) => {
+        {shownClasses.map((c) => {
           const active = c.graduationYear === activeYear
           return (
             <Pressable
@@ -253,6 +296,17 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: space.md },
   eyebrow: { ...type.caption, color: colors.gold, marginBottom: space.xs },
   title: { ...type.display, color: colors.text },
+  genderRow: { flexDirection: "row", gap: space.sm, paddingHorizontal: space.lg, marginBottom: space.md },
+  genderTab: {
+    paddingHorizontal: space.lg,
+    paddingVertical: space.sm,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.line,
+  },
+  genderTabActive: { backgroundColor: colors.gold, borderColor: colors.gold },
+  genderText: { ...type.label, color: colors.textSecondary },
+  genderTextActive: { color: colors.ink },
   chipStrip: { flexGrow: 0, minHeight: 46, marginBottom: space.md },
   chips: { paddingHorizontal: space.lg, gap: space.sm, alignItems: "center" },
   chip: {

@@ -18,9 +18,21 @@ export type RankedProspect = {
 
 export type RankingClass = {
   graduationYear: number
+  /** Stored lowercase in `public_rankings`; "male" or "female". */
+  gender: RankingGender
   publishedAt: string | null
   count: number
 }
+
+/**
+ * Rankings are published per class *and* per gender, and this app used to ignore the second half.
+ *
+ * `fetchRankings` filtered on graduation year alone, so every row for a class landed in one list.
+ * That happened to look right only because nobody had ever written a girls' row into the table —
+ * the web publish deliberately withheld them, because the day one was written it would have
+ * appeared inside the boys' rankings on every phone.
+ */
+export type RankingGender = "male" | "female"
 
 /**
  * Mirrors lib/public-rankings-cap.ts in the web app. RecruitNC publishes a top 30, and only for
@@ -49,32 +61,38 @@ const meaningful = (v: string | null) =>
  * Rankings are grouped by graduation class, not weight — weight_class reads "TBD" on all but one
  * row, so it is never surfaced. Each class is published as its own edition.
  */
+function genderOf(raw: unknown): RankingGender {
+  return String(raw ?? "").trim().toLowerCase() === "female" ? "female" : "male"
+}
+
 export async function fetchRankingClasses(): Promise<RankingClass[]> {
   const { data, error } = await supabase
     .from("public_rankings")
-    .select("graduation_year, published_at")
+    .select("graduation_year, gender, published_at")
     .eq("is_published", true)
 
   if (error) throw new Error(error.message)
 
-  const byYear = new Map<number, RankingClass>()
+  const byKey = new Map<string, RankingClass>()
   for (const row of data ?? []) {
     const year = row.graduation_year
     if (!year || !PUBLISHED_YEARS.includes(year)) continue
-    const existing = byYear.get(year)
+    const gender = genderOf((row as { gender?: unknown }).gender)
+    const key = `${year}|${gender}`
+    const existing = byKey.get(key)
     if (existing) {
       existing.count += 1
       if (row.published_at && (!existing.publishedAt || row.published_at > existing.publishedAt)) {
         existing.publishedAt = row.published_at
       }
     } else {
-      byYear.set(year, { graduationYear: year, publishedAt: row.published_at ?? null, count: 1 })
+      byKey.set(key, { graduationYear: year, gender, publishedAt: row.published_at ?? null, count: 1 })
     }
   }
 
-  return [...byYear.values()]
+  return [...byKey.values()]
     .map((c) => ({ ...c, count: Math.min(c.count, maxRankFor(c.graduationYear)) }))
-    .sort((a, b) => a.graduationYear - b.graduationYear)
+    .sort((a, b) => a.graduationYear - b.graduationYear || a.gender.localeCompare(b.gender))
 }
 
 
@@ -164,7 +182,10 @@ async function fetchAllAmericans(athleteIds: string[]): Promise<Record<string, s
   return out
 }
 
-export async function fetchRankings(graduationYear: number): Promise<RankedProspect[]> {
+export async function fetchRankings(
+  graduationYear: number,
+  gender: RankingGender = "male",
+): Promise<RankedProspect[]> {
   if (!PUBLISHED_YEARS.includes(graduationYear)) return []
 
   const { data, error } = await supabase
@@ -172,6 +193,8 @@ export async function fetchRankings(graduationYear: number): Promise<RankedProsp
     .select("id, prospect_id, name, high_school, state_result, academic_gpa, ranked_win, prospect_ranking, profile_image_url")
     .eq("is_published", true)
     .eq("graduation_year", graduationYear)
+    // Stored lowercase; matched case-insensitively so a capitalised row cannot vanish.
+    .ilike("gender", gender)
     .lte("prospect_ranking", maxRankFor(graduationYear))
     .gte("prospect_ranking", 1)
     .order("prospect_ranking", { ascending: true })
