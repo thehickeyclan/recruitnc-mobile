@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from "react-native"
+import { Image, Pressable, StyleSheet, Text, View } from "react-native"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors, radius, space, type } from "@/theme/tokens"
 import { countdownLine, daysUntil, SEEDS_ANNOUNCED } from "@/lib/toc-countdown"
@@ -62,8 +62,13 @@ export function TocMadness({
 
   return (
     <View style={styles.card}>
-      <Text style={styles.eyebrow}>THE BRACKET CHALLENGE</Text>
-      <Text style={styles.headline}>Get ready for TOC Madness</Text>
+      {/* The mark does the shouting; the words underneath just say when. */}
+      <Image
+        source={require("../../assets/images/toc-madness-logo.png")}
+        style={styles.logo}
+        resizeMode="contain"
+        accessibilityLabel="TOC Madness"
+      />
       <Text style={styles.lede}>{countdownLine(days)}</Text>
 
       <View style={styles.steps}>
@@ -127,8 +132,8 @@ const styles = StyleSheet.create({
     padding: space.lg,
     gap: space.sm,
   },
-  eyebrow: { ...type.caption, color: colors.gold },
-  headline: { ...type.display, color: colors.text, marginTop: space.xs },
+  // Full card width at the logo's own ratio, so it never crops on a narrow phone.
+  logo: { width: "100%", aspectRatio: 1918 / 820, marginBottom: space.xs },
   lede: { ...type.body, color: colors.textSecondary },
 
   steps: { gap: space.md, marginTop: space.md, marginBottom: space.sm },
