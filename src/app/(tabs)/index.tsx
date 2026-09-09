@@ -125,6 +125,7 @@ export default function HomeScreen() {
           total={total}
           onOpenToc={() => router.push("/toc")}
           onStartBracket={() => router.push("/toc-bracket")}
+          onSeeField={() => router.push("/toc-field")}
         />
 
         {events.length > 0 ? (

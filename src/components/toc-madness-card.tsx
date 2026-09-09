@@ -7,18 +7,24 @@ import { countdownLine, daysUntil, SEEDS_ANNOUNCED } from "@/lib/toc-countdown"
  * The tournament, as the top card on Home.
  *
  * Says the whole pitch in the space of a card — what it is, when it turns real, and one way in —
- * then hands off to the hub for everything else. The full three-step version lives there.
+ * then hands off to the hub for everything else.
+ *
+ * Before the brackets drop the button goes to the field, not the bracket. It used to invite people
+ * to seed a bracket themselves; that is gone, and a gold button leading to a panel that says come
+ * back Friday is worse than no button.
  */
 export function TocMadnessCard({
   announced,
   total,
   onOpenToc,
   onStartBracket,
+  onSeeField,
 }: {
   announced: number
   total: number
   onOpenToc: () => void
   onStartBracket: () => void
+  onSeeField: () => void
 }) {
   const seedsOut = daysUntil(SEEDS_ANNOUNCED) <= 0
 
@@ -38,12 +44,12 @@ export function TocMadnessCard({
       </Pressable>
 
       <Text style={styles.lede}>
-        Seed every weight the way you see it and run the draw. {countdownLine(daysUntil(SEEDS_ANNOUNCED))}
+        Seeded by The NC Mat, released in the app first. {countdownLine(daysUntil(SEEDS_ANNOUNCED))}
       </Text>
 
-      <Pressable style={styles.cta} onPress={onStartBracket}>
-        <Ionicons name="git-branch" size={16} color={colors.ink} />
-        <Text style={styles.ctaText}>{seedsOut ? "Submit your bracket" : "Start your bracket"}</Text>
+      <Pressable style={styles.cta} onPress={seedsOut ? onStartBracket : onSeeField}>
+        <Ionicons name={seedsOut ? "git-branch" : "people"} size={16} color={colors.ink} />
+        <Text style={styles.ctaText}>{seedsOut ? "Pick your bracket" : "See who's in"}</Text>
       </Pressable>
 
       <Pressable
