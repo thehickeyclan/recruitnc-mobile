@@ -56,9 +56,21 @@ export default function TocLeaderboardScreen() {
       <View style={styles.header}>
         <View style={styles.headerRow}>
           <Text style={styles.eyebrow}>TOURNAMENT OF CHAMPIONS</Text>
-          <Pressable onPress={() => router.back()} hitSlop={10}>
-            <Ionicons name="close" size={24} color={colors.textSecondary} />
-          </Pressable>
+          {/* The other half of the pair — see the bracket the standing came from, without going home. */}
+          <View style={styles.headerActions}>
+            <Pressable
+              onPress={() => router.replace("/toc-bracket")}
+              hitSlop={10}
+              accessibilityRole="button"
+              style={styles.crossLink}
+            >
+              <Ionicons name="git-branch-outline" size={15} color={colors.gold} />
+              <Text style={styles.crossLinkText}>My bracket</Text>
+            </Pressable>
+            <Pressable onPress={() => router.back()} hitSlop={10}>
+              <Ionicons name="close" size={24} color={colors.textSecondary} />
+            </Pressable>
+          </View>
         </View>
         <Text style={styles.title}>Leaderboard</Text>
         <Text style={styles.subtitle}>
@@ -130,6 +142,18 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: space.md },
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   eyebrow: { ...type.caption, color: colors.gold },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: space.md },
+  crossLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: space.sm,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.line,
+  },
+  crossLinkText: { ...type.caption, color: colors.gold },
   title: { ...type.display, color: colors.text, marginTop: 2 },
   subtitle: { ...type.label, color: colors.textMuted, marginTop: space.xs, fontWeight: "500" },
 

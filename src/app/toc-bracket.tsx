@@ -323,9 +323,25 @@ export default function TocBracketScreen() {
               Your Bracket
             </Text>
           </View>
-          <Pressable onPress={() => router.back()} hitSlop={12} accessibilityLabel="Close">
-            <Ionicons name="close" size={26} color={colors.textMuted} />
-          </Pressable>
+          {/*
+            Straight across to the standings. During the tournament people bounce between "how is
+            my bracket doing" and "where am I", and closing to the hub to cross between them is a
+            tap of pure friction on the two screens they will live in all weekend.
+          */}
+          <View style={styles.headerActions}>
+            <Pressable
+              onPress={() => router.replace("/toc-leaderboard")}
+              hitSlop={10}
+              accessibilityRole="button"
+              style={styles.crossLink}
+            >
+              <Ionicons name="podium-outline" size={15} color={colors.gold} />
+              <Text style={styles.crossLinkText}>Leaderboard</Text>
+            </Pressable>
+            <Pressable onPress={() => router.back()} hitSlop={12} accessibilityLabel="Close">
+              <Ionicons name="close" size={26} color={colors.textMuted} />
+            </Pressable>
+          </View>
         </View>
       </View>
 
@@ -525,6 +541,18 @@ const styles = StyleSheet.create({
   eyebrow: { ...type.caption, color: colors.gold, marginBottom: space.xs },
   title: { ...type.display, color: colors.text },
 
+  headerActions: { flexDirection: "row", alignItems: "center", gap: space.md },
+  crossLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: space.sm,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.line,
+  },
+  crossLinkText: { ...type.caption, color: colors.gold },
   centre: { alignItems: "center", justifyContent: "center", gap: space.md, paddingVertical: space.xxl, paddingHorizontal: space.xl },
   emptyTitle: { ...type.title, color: colors.text, textAlign: "center" },
   emptyText: { ...type.body, color: colors.textMuted, textAlign: "center" },
