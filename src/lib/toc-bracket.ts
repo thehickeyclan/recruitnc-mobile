@@ -105,12 +105,23 @@ export async function buildBracketPreview(
     signal: signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })
 
-  const data = (await response.json().catch(() => null)) as (BracketPreview & { error?: string }) | null
+  const data = (await response.json().catch(() => null)) as
+    | (BracketPreview & { error?: string; released?: boolean })
+    | null
+
+  // Not released is a state, not a failure: the server says so explicitly so the screen can show
+  // a locked panel instead of red error text.
+  if (data && data.released === false) {
+    throw new BracketNotReleasedError(data.error ?? "Brackets have not been released yet.")
+  }
   if (!response.ok || !data || data.error) {
     throw new Error(data?.error ?? "Could not build that bracket.")
   }
   return data
 }
+
+/** Thrown when the tournament simply has not published brackets yet. */
+export class BracketNotReleasedError extends Error {}
 
 /** Bouts grouped in the order the rounds actually happen, for a phone-shaped read. */
 export function boutsByRound(draw: BracketDraw): Array<{ round: string; bouts: BracketBout[] }> {

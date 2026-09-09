@@ -8,6 +8,7 @@ import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors, radius, space, type } from "@/theme/tokens"
 import { compareBySurname, fetchTocField, type TocField, type TocFieldAthlete } from "@/lib/toc-field"
 import {
+  BracketNotReleasedError,
   buildBracketPreview,
   slotLabel,
   slotSeed,
@@ -131,6 +132,8 @@ export default function TocBracketScreen() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /** Not released is a state of the tournament, not a failure of the app. */
+  const [notReleased, setNotReleased] = useState(false)
   const [sharing, setSharing] = useState(false)
   /** Points at the off-screen, unscrolled copy of the card — see share-bracket.ts. */
   const shareRef = useRef<View>(null)
@@ -207,8 +210,16 @@ export default function TocBracketScreen() {
     let cancelled = false
     setBusy(true)
     buildBracketPreview(weight, seeded)
-      .then((p) => !cancelled && setPreview(p))
-      .catch((e) => !cancelled && setError(e instanceof Error ? e.message : "Could not build that bracket."))
+      .then((p) => {
+        if (cancelled) return
+        setNotReleased(false)
+        setPreview(p)
+      })
+      .catch((e) => {
+        if (cancelled) return
+        setNotReleased(e instanceof BracketNotReleasedError)
+        setError(e instanceof Error ? e.message : "Could not build that bracket.")
+      })
       .finally(() => !cancelled && setBusy(false))
     return () => {
       cancelled = true
@@ -359,7 +370,21 @@ export default function TocBracketScreen() {
             </View>
           ) : (
             <ScrollView contentContainerStyle={styles.body}>
-              {error ? <Text style={styles.errorText}>{error}</Text> : null}
+              {/*
+                A bracket that has not been released is not an error, and must not be dressed as
+                one. The server answers this screen with a reason rather than a failure; printing
+                it in red made a tournament that had simply not published yet look like a broken
+                app to the parents reading it.
+              */}
+              {notReleased ? (
+                <View style={styles.centre}>
+                  <Ionicons name="lock-closed-outline" size={34} color={colors.line} />
+                  <Text style={styles.emptyTitle}>Brackets not released yet</Text>
+                  <Text style={styles.emptyText}>{error}</Text>
+                </View>
+              ) : error ? (
+                <Text style={styles.errorText}>{error}</Text>
+              ) : null}
 
               {/* Seeding is how you build a projection. Once TOC has released the real draw
                   there is nothing to seed — the bracket is simply the bracket. */}
