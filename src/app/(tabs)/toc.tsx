@@ -106,7 +106,7 @@ export default function TocHubScreen() {
           <Row
             icon="git-branch"
             title="Your Bracket"
-            detail="Seed it yourself and run the draw"
+            detail="Released Friday at 5:00 PM — then pick every bout"
             onPress={() => router.push("/toc-bracket")}
           />
           <Row
@@ -139,8 +139,8 @@ export default function TocHubScreen() {
           {enabled ? (
             <View style={styles.toggleRow}>
               <View style={styles.flex}>
-                <Text style={styles.rowTitle}>Weight class releases</Text>
-                <Text style={styles.rowDetail}>The moment a field goes live</Text>
+                <Text style={styles.rowTitle}>Fields and brackets</Text>
+                <Text style={styles.rowDetail}>When a weight goes live, and when brackets drop</Text>
               </View>
               <Switch
                 value={prefs.toc}
@@ -153,7 +153,7 @@ export default function TocHubScreen() {
             <Pressable style={styles.enable} onPress={() => void enable()} disabled={busy}>
               <Ionicons name="notifications" size={16} color={colors.ink} />
               <Text style={styles.enableText}>
-                {busy ? "Turning on…" : "Know the moment a weight class drops"}
+                {busy ? "Turning on…" : "Know the moment the brackets drop"}
               </Text>
             </Pressable>
           )}

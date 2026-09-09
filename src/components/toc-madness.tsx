@@ -6,13 +6,14 @@ import { countdownLine, daysUntil, SEEDS_ANNOUNCED } from "@/lib/toc-countdown"
 /**
  * The pitch that opens the app.
  *
- * The campaign tells people to download this to see the field and build a bracket, and the hub
+ * The campaign tells people to download this to see the field and follow a bracket, and the hub
  * underneath is a list of destinations — accurate, but it never says why any of it is worth your
- * evening. This does: play now with the seeds you believe in, submit for real once they are
- * announced, score points as the tournament runs.
+ * evening. This does: the brackets drop Friday, you pick the winners, you score as it wrestles.
  *
- * Two steps, in the order they happen, so the second one reads as a reason to come back rather
- * than a feature that is missing.
+ * It used to open by inviting people to seed the weights themselves. That is gone: the seeding is
+ * the tournament's, and the brackets built from anyone else's guesses were being screenshotted and
+ * passed around as though they were the draw. What people bring now is picks, not seeds — so the
+ * card promises picks.
  */
 
 function Step({
@@ -55,16 +56,16 @@ export function TocMadness({ onStart }: { onStart: () => void }) {
       <View style={styles.steps}>
         <Step
           number="1"
-          when="PLAY NOW"
-          title="Seed it the way you see it"
-          detail="Order every weight yourself, then run the draw round by round and find out who you have taking it."
+          when={seedsOut ? "OUT NOW" : "FRIDAY, 5:00 PM"}
+          title="The brackets drop"
+          detail="Every weight, seeded by The NC Mat and released here in the app first."
           live={!seedsOut}
         />
         <Step
           number="2"
-          when={seedsOut ? "OPEN NOW" : "11 SEPTEMBER"}
-          title="Submit for real"
-          detail="Once the official seeds are announced, submit a bracket at each weight, then score points as the tournament runs and watch the leaderboard."
+          when={seedsOut ? "OPEN NOW" : "STRAIGHT AFTER"}
+          title="Pick your winners"
+          detail="Call every bout at each weight, then score points as the tournament runs and watch the leaderboard."
           live={seedsOut}
         />
       </View>

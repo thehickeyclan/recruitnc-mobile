@@ -22,12 +22,13 @@ describe("daysUntil", () => {
 
 describe("countdownLine", () => {
   it("switches from plural to tomorrow to today", () => {
-    expect(countdownLine(17)).toBe("17 days until the official seeds drop.")
-    expect(countdownLine(1)).toBe("The official seeds drop tomorrow.")
-    expect(countdownLine(0)).toBe("The official seeds drop today.")
+    expect(countdownLine(17)).toBe("17 days until the brackets drop.")
+    // The time is named from one day out: "tomorrow" without it sends people looking at breakfast.
+    expect(countdownLine(1)).toBe("The brackets drop tomorrow at 5:00 PM.")
+    expect(countdownLine(0)).toBe("The brackets drop today at 5:00 PM.")
   })
 
-  it("stops counting down once the seeds are out", () => {
-    expect(countdownLine(-3)).toContain("lock in your brackets")
+  it("stops counting down once the brackets are out", () => {
+    expect(countdownLine(-3)).toContain("make your picks")
   })
 })

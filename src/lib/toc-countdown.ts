@@ -1,4 +1,4 @@
-/** The morning the real seeds go public and projections stop being guesses. */
+/** When the official brackets are released in the app. Friday 11 September, 5:00 PM. */
 export const SEEDS_ANNOUNCED = "2026-09-11"
 
 /**
@@ -16,8 +16,8 @@ export function daysUntil(iso: string, now = new Date()): number {
 
 /** How the wait is described above the fold. */
 export function countdownLine(days: number): string {
-  if (days > 1) return `${days} days until the official seeds drop.`
-  if (days === 1) return "The official seeds drop tomorrow."
-  if (days === 0) return "The official seeds drop today."
-  return "The official seeds are out — lock in your brackets."
+  if (days > 1) return `${days} days until the brackets drop.`
+  if (days === 1) return "The brackets drop tomorrow at 5:00 PM."
+  if (days === 0) return "The brackets drop today at 5:00 PM."
+  return "The brackets are out — make your picks."
 }
