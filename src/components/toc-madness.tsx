@@ -132,8 +132,15 @@ const styles = StyleSheet.create({
     padding: space.lg,
     gap: space.sm,
   },
-  // Full card width at the logo's own ratio, so it never crops on a narrow phone.
-  logo: { width: "100%", aspectRatio: 1918 / 820, marginBottom: space.xs },
+  /**
+   * An explicit height, not an aspect ratio.
+   *
+   * `width: "100%"` with `aspectRatio` let the image size itself, and it rendered many times the
+   * height of the card — the mark filled the entire screen with the steps and the button pushed
+   * off the bottom. A fixed height with `contain` cannot do that: the image fits the box it is
+   * given, whatever the source dimensions are.
+   */
+  logo: { width: "100%", height: 104, marginBottom: space.xs },
   lede: { ...type.body, color: colors.textSecondary },
 
   steps: { gap: space.md, marginTop: space.md, marginBottom: space.sm },
