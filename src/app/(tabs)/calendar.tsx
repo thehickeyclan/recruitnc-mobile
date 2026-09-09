@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native"
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { router } from "expo-router"
 import * as WebBrowser from "expo-web-browser"
@@ -196,7 +196,13 @@ export default function CalendarScreen() {
             </Pressable>
 
             {teamPickerOpen ? (
-              <View style={styles.teamList}>
+              /*
+                Scrollable and bounded. This list lived in the fixed header above the calendar, so
+                it had no scroll of its own and simply ran off the bottom — twelve programs sorted
+                alphabetically meant both UNCs were the ones cut off, and they are the two people
+                are most likely to want.
+              */
+              <ScrollView style={styles.teamList} nestedScrollEnabled contentContainerStyle={styles.teamListContent}>
                 {college.teams.map((team) => {
                   const following = college.followed.includes(team.id)
                   return (
@@ -219,7 +225,7 @@ export default function CalendarScreen() {
                     </Pressable>
                   )
                 })}
-              </View>
+              </ScrollView>
             ) : null}
 
             {college.notice ? (
@@ -329,7 +335,9 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
   },
   collegeToggleText: { ...type.label, color: colors.textSecondary, flex: 1 },
-  teamList: { gap: 2 },
+  // Roughly six rows before it scrolls, so the calendar underneath is never pushed off-screen.
+  teamList: { maxHeight: 240 },
+  teamListContent: { gap: 2, paddingBottom: space.xs },
   teamRow: {
     flexDirection: "row",
     alignItems: "center",
