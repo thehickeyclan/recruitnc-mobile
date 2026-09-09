@@ -15,6 +15,7 @@ import { router, useLocalSearchParams } from "expo-router"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors, radius, space, type } from "@/theme/tokens"
 import { openAthleteProfile } from "@/lib/profile-link"
+import { daysUntil, SEEDS_ANNOUNCED } from "@/lib/toc-countdown"
 import {
   fetchTocField,
   headlineCredential,
@@ -113,6 +114,10 @@ export default function TocFieldScreen() {
     [field, selected],
   )
 
+  // Before Friday there is no bracket to open, so the button says when there will be.
+  const bracketCtaLabel =
+    daysUntil(SEEDS_ANNOUNCED) <= 0 ? "See the bracket" : "Brackets drop Friday at 5:00 PM"
+
   return (
     <SafeAreaView style={styles.screen} edges={["top"]}>
       <View style={styles.header}>
@@ -131,7 +136,11 @@ export default function TocFieldScreen() {
           Announced by weight class. Listed alphabetically — the field is not seeded.
         </Text>
 
-        {/* One tap from the reveal someone was just alerted about, with the weight carried over. */}
+        {/*
+          One tap from the reveal someone was just alerted about, with the weight carried over.
+          It used to offer to seed the weight yourself; the seeding is the tournament's now, so
+          this offers the bracket it will actually draw.
+        */}
         <Pressable
           style={styles.bracketCta}
           onPress={() =>
@@ -142,7 +151,7 @@ export default function TocFieldScreen() {
           }
         >
           <Ionicons name="git-network" size={15} color={colors.ink} />
-          <Text style={styles.bracketCtaText}>Seed it yourself and run the bracket</Text>
+          <Text style={styles.bracketCtaText}>{bracketCtaLabel}</Text>
         </Pressable>
       </View>
 

@@ -365,7 +365,7 @@ export default function TocBracketScreen() {
               <Ionicons name="lock-closed-outline" size={34} color={colors.line} />
               <Text style={styles.emptyTitle}>No weights released yet</Text>
               <Text style={styles.emptyText}>
-                Once a weight class field is announced you can seed it and run the bracket.
+                Brackets are released Friday at 5:00 PM, once every field is announced.
               </Text>
             </View>
           ) : (
