@@ -76,7 +76,10 @@ export function TocMadness({
           number="1"
           when={seedsOut ? "OUT NOW" : "FRIDAY, 5:00 PM"}
           title="The brackets drop"
-          detail="All ten weights, seeded by The NC Mat — in the app before anywhere else."
+          // Not "all ten": weights are released as each draw is locked, and one may still be
+          // waiting on a replacement wrestler at five o'clock. Promising ten is a promise the
+          // release button cannot keep on its own.
+          detail="Every weight, seeded by The NC Mat — in the app before anywhere else."
           live={!seedsOut}
         />
         <Step
