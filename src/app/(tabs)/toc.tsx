@@ -172,7 +172,10 @@ export default function TocHubScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.ink },
-  content: { padding: space.lg, paddingBottom: space.xxl * 2, gap: space.md },
+  // Deep enough to scroll the last row clear of the Data Dawg button, which floats 96pt from the
+  // bottom across every tab. At the old padding the last row could not rise past it, so "Your
+  // Bracket" sat permanently half-covered — the row people want most on Friday.
+  content: { padding: space.lg, paddingBottom: 160, gap: space.md },
   flex: { flex: 1 },
 
   head: { flexDirection: "row", alignItems: "center", gap: space.md, marginBottom: space.sm },
