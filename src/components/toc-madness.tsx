@@ -43,7 +43,20 @@ function Step({
   )
 }
 
-export function TocMadness({ onStart }: { onStart: () => void }) {
+export function TocMadness({
+  onStart,
+  onSeeField,
+  onRemindMe,
+  alertsOn,
+  busy,
+}: {
+  onStart: () => void
+  onSeeField: () => void
+  /** Turn on TOC alerts, so Friday at five arrives as a notification rather than a memory. */
+  onRemindMe: () => void
+  alertsOn: boolean
+  busy?: boolean
+}) {
   const days = daysUntil(SEEDS_ANNOUNCED)
   const seedsOut = days <= 0
 
@@ -58,23 +71,48 @@ export function TocMadness({ onStart }: { onStart: () => void }) {
           number="1"
           when={seedsOut ? "OUT NOW" : "FRIDAY, 5:00 PM"}
           title="The brackets drop"
-          detail="Every weight, seeded by The NC Mat and released here in the app first."
+          detail="All ten weights, seeded by The NC Mat — in the app before anywhere else."
           live={!seedsOut}
         />
         <Step
           number="2"
-          when={seedsOut ? "OPEN NOW" : "STRAIGHT AFTER"}
-          title="Pick your winners"
-          detail="Call every bout at each weight, then score points as the tournament runs and watch the leaderboard."
+          when={seedsOut ? "OPEN NOW" : "THE MOMENT THEY LAND"}
+          title="Submit your bracket"
+          detail="Call every bout at every weight. One entry each, and you can change it until the wrestling starts."
           live={seedsOut}
+        />
+        <Step
+          number="3"
+          when="ALL WEEKEND"
+          title="Climb the leaderboard"
+          detail="Points land as the bouts do. Watch your bracket hold up, or fall apart, in real time."
         />
       </View>
 
-      <Pressable style={styles.cta} onPress={onStart}>
-        <Ionicons name="git-branch" size={16} color={colors.ink} />
-        <Text style={styles.ctaText}>{seedsOut ? "Submit your bracket" : "Start your bracket"}</Text>
-      </Pressable>
-      <Text style={styles.fine}>One entry per weight, per account.</Text>
+      {/*
+        Before Friday there is no bracket to open, so the button does the one thing worth doing
+        now: makes sure five o'clock arrives as a notification. Somebody who has already turned
+        alerts on gets sent to the field instead of a button that does nothing.
+      */}
+      {seedsOut ? (
+        <Pressable style={styles.cta} onPress={onStart}>
+          <Ionicons name="git-branch" size={16} color={colors.ink} />
+          <Text style={styles.ctaText}>Submit your bracket</Text>
+        </Pressable>
+      ) : alertsOn ? (
+        <Pressable style={styles.cta} onPress={onSeeField}>
+          <Ionicons name="people" size={16} color={colors.ink} />
+          <Text style={styles.ctaText}>See who&apos;s in</Text>
+        </Pressable>
+      ) : (
+        <Pressable style={styles.cta} onPress={onRemindMe} disabled={busy}>
+          <Ionicons name="notifications" size={16} color={colors.ink} />
+          <Text style={styles.ctaText}>{busy ? "Turning on…" : "Remind me Friday at 5:00"}</Text>
+        </Pressable>
+      )}
+      <Text style={styles.fine}>
+        {seedsOut ? "One entry per weight, per account." : "Free to enter. One entry per weight, per account."}
+      </Text>
     </View>
   )
 }

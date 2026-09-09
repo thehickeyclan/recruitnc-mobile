@@ -94,7 +94,13 @@ export default function TocHubScreen() {
           </View>
         </View>
 
-        <TocMadness onStart={() => router.push("/toc-bracket")} />
+        <TocMadness
+          onStart={() => router.push("/toc-bracket")}
+          onSeeField={() => router.push("/toc-field")}
+          onRemindMe={() => void enable()}
+          alertsOn={enabled && prefs.toc}
+          busy={busy}
+        />
 
         <View style={styles.group}>
           <Row
