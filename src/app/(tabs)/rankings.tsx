@@ -75,8 +75,12 @@ function RankRow({ prospect }: { prospect: RankedProspect }) {
           <View style={styles.badges}>
             {/* All-American first: it is the strongest thing on the row, and it is national. */}
             {prospect.allAmerican ? (
+              // The server's own wording — "2x All-American", "2025 NHSCA All-American" — so a
+              // wrestler reads the same on the phone as on his ranking card.
               <View style={[styles.badge, styles.badgeAA]}>
-                <Text style={[styles.badgeText, styles.badgeTextAA]}>ALL-AMERICAN</Text>
+                <Text style={[styles.badgeText, styles.badgeTextAA]}>
+                  {prospect.allAmerican.toUpperCase()}
+                </Text>
               </View>
             ) : null}
             {prospect.stateResult ? (

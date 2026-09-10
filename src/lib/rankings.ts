@@ -1,3 +1,4 @@
+import { clientHeader } from "@/lib/client-header"
 import { supabase } from "./supabase"
 
 export type RankedProspect = {
@@ -148,38 +149,47 @@ async function fetchProspectPhotos(athleteIds: string[]): Promise<Record<string,
 }
 
 
-/** Top eight at NHSCA is All-American — same rule and same table the TOC field uses. */
-const NHSCA_ALL_AMERICAN_PLACES = 8
-
 /**
- * All-American finishes, newest first.
+ * All-American status, from the web app's credential engine rather than from a query of our own.
  *
- * Read from `nhsca_placements` rather than the legacy `nhsca_*_placement` columns on `athletes`:
- * those are stale, and going by them found three All-Americans in this list where the live table
- * has ten. The TOC field reads the same place, so the two screens cannot disagree about who is one.
+ * This used to read `nhsca_placements` directly, filtered on `athlete_id`. That looked correct and
+ * was not: 60 of the 106 All-American rows in that table carry no `athlete_id`, because a 2025
+ * import shifted the first word of each wrestler's school onto the end of their name — "Jacob
+ * Perry New", school "Bern". Rows like that were never linked, so the query dropped them without
+ * erroring. The phone showed 5 All-Americans in the Class of 2028 where the website showed 9, and
+ * which four went missing depended on nothing anybody could see from the outside.
+ *
+ * The web reconciles a name against the school and the seasons a wrestler could plausibly have
+ * competed in, so it finds them whether or not the row was ever linked. Rather than port that
+ * matcher into this repo — a fourth implementation of one question — the app asks for the answer.
+ *
+ * There is deliberately no fallback to the old query. A fallback means two answers again, and the
+ * wrong one would only ever surface when nobody was watching. If this call fails the badges are
+ * simply absent, which is what the broken query already produced for those wrestlers anyway.
  */
-async function fetchAllAmericans(athleteIds: string[]): Promise<Record<string, string>> {
-  if (athleteIds.length === 0) return {}
-  const { data } = await supabase
-    .from("nhsca_placements")
-    .select("athlete_id, year, placement")
-    .in("athlete_id", athleteIds)
+const CREDENTIALS_TIMEOUT_MS = 10_000
 
-  const byAthlete = new Map<string, { year: number; placement: number }[]>()
-  for (const row of data ?? []) {
-    const id = typeof row.athlete_id === "string" ? row.athlete_id : ""
-    const place = Number(row.placement)
-    const year = Number(row.year)
-    if (!id || !Number.isInteger(place) || place < 1 || place > NHSCA_ALL_AMERICAN_PLACES) continue
-    byAthlete.set(id, [...(byAthlete.get(id) ?? []), { year, placement: place }])
+async function fetchAllAmericans(graduationYear: number): Promise<Record<string, string>> {
+  const base = process.env.EXPO_PUBLIC_WEB_BASE_URL
+  if (!base) return {}
+  try {
+    const response = await fetch(`${base}/api/public/rankings-credentials?year=${graduationYear}`, {
+      headers: { ...clientHeader(), Accept: "application/json" },
+      signal: AbortSignal.timeout(CREDENTIALS_TIMEOUT_MS),
+    })
+    if (!response.ok) return {}
+    const body = (await response.json()) as {
+      athletes?: { athleteId?: string; allAmerican?: { label?: string } | null }[]
+    }
+    const out: Record<string, string> = {}
+    for (const row of body.athletes ?? []) {
+      // The wording lives on the server, so the phone and the website cannot word it differently.
+      if (row.athleteId && row.allAmerican?.label) out[row.athleteId] = row.allAmerican.label
+    }
+    return out
+  } catch {
+    return {}
   }
-
-  const out: Record<string, string> = {}
-  for (const [id, rows] of byAthlete) {
-    const newest = rows.sort((a, b) => b.year - a.year)[0]
-    if (newest) out[id] = `${newest.year || ""} NHSCA All-American`.trim()
-  }
-  return out
 }
 
 export async function fetchRankings(
@@ -208,7 +218,7 @@ export async function fetchRankings(
   const [photos, schoolLogos, allAmericans] = await Promise.all([
     fetchProspectPhotos(athleteIds),
     fetchSchoolLogos(schools),
-    fetchAllAmericans(athleteIds),
+    fetchAllAmericans(graduationYear),
   ])
 
   return rows.map((r) => {
