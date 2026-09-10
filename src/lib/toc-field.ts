@@ -3,7 +3,18 @@ import { clientHeader } from "@/lib/client-header"
 const BASE = process.env.EXPO_PUBLIC_WEB_BASE_URL
 
 /** The field can be a few hundred KB once several weights are out. */
-const REQUEST_TIMEOUT_MS = 20_000
+/**
+ * Forty-five seconds, because the honest worst case is about thirty.
+ *
+ * The field is cached on the server, but a cold rebuild reconciles every wrestler by name and
+ * takes roughly thirty seconds. At twenty this gave up first and the screen said "fetch failed",
+ * which reads as a broken app rather than a slow one — and it happened to whoever was unlucky
+ * enough to be first after a cache lapse, so it looked random.
+ *
+ * The real fix is on the server (the field is now cached for a day and rebuilt the moment staff
+ * announce or release, so cold reads are rare). This is the seatbelt for when one happens anyway.
+ */
+const REQUEST_TIMEOUT_MS = 45_000
 
 export type TocCredential = {
   kind: "all-american" | "state-champion" | "state-placer" | "state-qualifier"
