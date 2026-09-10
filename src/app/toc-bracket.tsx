@@ -175,10 +175,6 @@ export default function TocBracketScreen() {
     () => (orders[key] ?? []).filter((id) => byId.has(id)),
     [orders, key, byId],
   )
-  const unseeded = useMemo(
-    () => defaultOrder(athletes).filter((id) => !seeded.includes(id)),
-    [athletes, seeded],
-  )
 
   const picks = allPicks[key] ?? {}
 
@@ -585,12 +581,6 @@ const styles = StyleSheet.create({
   body: { paddingHorizontal: space.lg, paddingBottom: space.xxl, gap: space.sm },
   instruction: { ...type.body, color: colors.textSecondary, marginBottom: space.xs },
 
-  seededWrap: { flexDirection: "row", flexWrap: "wrap", gap: space.sm, marginBottom: space.sm },
-  seededPill: {
-    flexDirection: "row", alignItems: "center", gap: 6,
-    backgroundColor: colors.gold, borderRadius: radius.pill,
-    paddingHorizontal: space.md, paddingVertical: 6, maxWidth: "100%",
-  },
   seededSeed: { ...type.caption, color: colors.ink, fontWeight: "700" },
   seededName: { ...type.label, color: colors.ink, flexShrink: 1 },
 
