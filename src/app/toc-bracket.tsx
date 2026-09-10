@@ -206,10 +206,21 @@ export default function TocBracketScreen() {
    * fills in as you seed rather than making you do eight taps of work before anything appears.
    */
   useEffect(() => {
-    if (weight == null || seeded.length === 0) return
+    if (weight == null || athletes.length === 0) return
     let cancelled = false
     setBusy(true)
-    buildBracketPreview(weight, seeded)
+    /*
+     * Asked on every weight, not only after the first tap.
+     *
+     * The old effect waited for a tap, so before release the screen had no idea whether brackets
+     * were out — and once somebody had tapped all eight names the picker hid itself and nothing
+     * took its place. A parent seeded a weight and got a blank page. Asking up front means this
+     * screen always knows which of the two states it is in.
+     *
+     * A released weight ignores the order we send and returns the locked draw, so the default
+     * ordering below is never a seeding claim.
+     */
+    buildBracketPreview(weight, seeded.length > 0 ? seeded : defaultOrder(athletes))
       .then((p) => {
         if (cancelled) return
         setNotReleased(false)
@@ -224,7 +235,7 @@ export default function TocBracketScreen() {
     return () => {
       cancelled = true
     }
-  }, [weight, seeded, athletes.length])
+  }, [weight, seeded, athletes])
 
   const simulated = useMemo(
     () => (preview ? simulate(preview.draw, picks) : null),
@@ -398,39 +409,40 @@ export default function TocBracketScreen() {
                   <Text style={styles.emptyTitle}>Brackets not released yet</Text>
                   <Text style={styles.emptyText}>{error}</Text>
                 </View>
-              ) : error ? (
+              ) : error && !error.includes("released") ? (
+                // A release notice is a state, not a failure. Older builds printed the server's
+                // release line in red, which is what made this look broken rather than locked.
                 <Text style={styles.errorText}>{error}</Text>
               ) : null}
 
-              {/* Seeding is how you build a projection. Once TOC has released the real draw
-                  there is nothing to seed — the bracket is simply the bracket. */}
-              {!preview?.official && seeded.length < athletes.length ? (
+              {/*
+                Before release: who is in the weight, and nothing more.
+                
+                This used to be a seeding picker that built a projection bracket. That projection
+                is gone — it was being screenshotted and passed around as though it were the real
+                draw — but removing it left the screen with nothing on it at all, which read as a
+                broken app rather than as a tournament that had not published yet.
+                
+                So the field itself is the answer. It is already public on the website, and it is
+                what somebody opening this screen actually wants to know: who my kid is in with.
+                
+                Alphabetical by surname, never by seed. That is not a choice made here — the
+                server sorts the field before it sends it, under the rule that seed order must not
+                be inferable from row order, and `defaultOrder` sorts by surname again on arrival.
+                Ryan's seeding is not readable from this list and never touches it.
+              */}
+              {!preview?.official ? (
                 <>
                   <Text style={styles.instruction}>
-                    Tap wrestlers in the order you&apos;d seed them — {seeded.length} of {athletes.length}.
+                    The field at {weight} lbs — {athletes.length} wrestlers, listed alphabetically.
+                    Seeds and the draw go live Friday at 5:00 PM.
                   </Text>
-                  {seeded.length > 0 ? (
-                    <View style={styles.seededWrap}>
-                      {seeded.map((id, i) => (
-                        <Pressable
-                          key={id}
-                          style={styles.seededPill}
-                          onPress={() => void saveOrder(seeded.filter((x) => x !== id))}
-                        >
-                          <Text style={styles.seededSeed}>{i + 1}</Text>
-                          <Text style={styles.seededName} numberOfLines={1}>
-                            {byId.get(id)?.name}
-                          </Text>
-                          <Ionicons name="close" size={12} color={colors.ink} />
-                        </Pressable>
-                      ))}
-                    </View>
-                  ) : null}
 
-                  {unseeded.map((id) => {
-                    const a = byId.get(id)!
+                  {defaultOrder(athletes).map((id) => {
+                    const a = byId.get(id)
+                    if (!a) return null
                     return (
-                      <Pressable key={id} style={styles.pick} onPress={() => void saveOrder([...seeded, id])}>
+                      <View key={id} style={styles.pick}>
                         <View style={styles.pickBody}>
                           <Text style={styles.name} numberOfLines={1}>
                             {a.name}
@@ -439,8 +451,7 @@ export default function TocBracketScreen() {
                             {[a.credentials[0]?.label, a.club].filter(Boolean).join(" · ")}
                           </Text>
                         </View>
-                        <Ionicons name="add-circle-outline" size={20} color={colors.gold} />
-                      </Pressable>
+                      </View>
                     )
                   })}
                 </>
