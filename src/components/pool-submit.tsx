@@ -182,7 +182,7 @@ export function PoolSubmit({
 
   return (
     <View style={styles.card}>
-      <Text style={styles.title}>{submitted ? "Submitted" : "Enter the pool"}</Text>
+      <Text style={styles.title}>{submitted ? "Submitted" : "Enter TOC Madness"}</Text>
       <Text style={styles.detail}>
         {submitted
           ? `Your ${weightClass} lbs bracket is in. You can change it until ${dayLabel(window.deadline)}.`
@@ -254,7 +254,7 @@ export function PoolSubmit({
           <>
             <Ionicons name={submitted ? "refresh" : "checkmark-circle"} size={16} color={colors.ink} />
             <Text style={styles.primaryText}>
-              {submitted ? "Update my entry" : `Enter ${weightClass} lbs in the pool`}
+              {submitted ? "Update my entry" : `Enter ${weightClass} lbs in TOC Madness`}
             </Text>
           </>
         )}
