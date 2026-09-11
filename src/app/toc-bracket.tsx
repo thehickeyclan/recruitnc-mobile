@@ -474,7 +474,22 @@ export default function TocBracketScreen() {
                         Nobody else can see your picks, and NC United never publishes them.
                       </Text>
                     </View>
-                  ) : null}
+                  ) : (
+                    /*
+                      After release the notice above stops showing, and the screen used to explain
+                      nothing: a parent tapping their kid's name watched him advance a round under a
+                      header reading "Official bracket", and could fairly think they had changed the
+                      real draw or seen a result. Kept off BracketCard itself, because that card is
+                      also the image people save and send, and an instruction does not belong in it.
+                    */
+                    <View style={styles.notice}>
+                      <Ionicons name="information-circle" size={15} color={colors.gold} />
+                      <Text style={styles.noticeText}>
+                        Tap a wrestler to pick a winner for TOC Madness. Your picks are private and don&apos;t
+                        change the official bracket.
+                      </Text>
+                    </View>
+                  )}
 
                   <BracketCard
                     weight={preview.weightClass}
