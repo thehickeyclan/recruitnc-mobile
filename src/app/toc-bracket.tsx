@@ -327,7 +327,7 @@ export default function TocBracketScreen() {
           <View style={styles.flexShrink}>
             <Text style={styles.eyebrow}>TOURNAMENT OF CHAMPIONS</Text>
             <Text style={styles.title} maxFontSizeMultiplier={1.4}>
-              Your Bracket
+              Official Brackets
             </Text>
           </View>
           {/*

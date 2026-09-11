@@ -65,7 +65,7 @@ export default function TocLeaderboardScreen() {
               style={styles.crossLink}
             >
               <Ionicons name="git-branch-outline" size={15} color={colors.gold} />
-              <Text style={styles.crossLinkText}>My bracket</Text>
+              <Text style={styles.crossLinkText}>Official brackets</Text>
             </Pressable>
             <Pressable onPress={() => router.back()} hitSlop={10}>
               <Ionicons name="close" size={24} color={colors.textSecondary} />

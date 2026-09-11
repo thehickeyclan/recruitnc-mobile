@@ -158,7 +158,7 @@ export default function MoreScreen() {
           <View style={styles.rowDivider} />
           <Pressable style={styles.row} onPress={() => router.push("/toc-bracket")}>
             <View style={styles.rowBody}>
-              <Text style={styles.rowTitle}>Your Bracket</Text>
+              <Text style={styles.rowTitle}>Official Brackets</Text>
               <Text style={styles.rowDetail}>The official draw and your TOC Madness picks</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
