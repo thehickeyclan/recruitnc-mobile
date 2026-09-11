@@ -68,6 +68,25 @@ export function TocMadnessCard({
         <Text style={styles.tickets}>Buy tickets for 18–19 September</Text>
       </Pressable>
 
+      <Pressable
+        onPress={() =>
+          void import("expo-web-browser").then((wb) =>
+            wb.openBrowserAsync(
+              `${process.env.EXPO_PUBLIC_WEB_BASE_URL}/store-app/product/2bcef953-6ce0-47e3-89e4-8b36c1c39f3a`,
+              {
+                presentationStyle: wb.WebBrowserPresentationStyle.PAGE_SHEET,
+                toolbarColor: colors.ink,
+                controlsColor: colors.gold,
+                dismissButtonStyle: "done",
+              },
+            ),
+          )
+        }
+        hitSlop={6}
+      >
+        <Text style={styles.tee}>Get the official tee</Text>
+      </Pressable>
+
       {total > 0 ? (
         <Pressable onPress={onOpenToc} hitSlop={6}>
           <Text style={styles.fine}>
@@ -112,6 +131,14 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontWeight: "700",
     textDecorationLine: "underline",
+  },
+  tee: {
+    ...type.label,
+    color: colors.gold,
+    textAlign: "center",
+    fontWeight: "700",
+    textDecorationLine: "underline",
+    marginTop: 10,
   },
   fine: {
     ...type.caption,

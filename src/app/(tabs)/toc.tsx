@@ -22,6 +22,9 @@ const TOC_WEB = `${WEB}/tournament-of-champions`
 // The GoFan event itself. Sending people to the tournament page first meant reading a page to
 // find a button, when they had already decided to come.
 const TOC_TICKETS = "https://gofan.co/event/6745154?schoolId=NC101846"
+// The official 2026 tee on the web store. Addressed by product id because that is how the store
+// routes products; if the listing is ever recreated this id has to follow it.
+const TOC_TEE = `${WEB}/store-app/product/2bcef953-6ce0-47e3-89e4-8b36c1c39f3a`
 
 function openWeb(url: string) {
   void WebBrowser.openBrowserAsync(url, {
@@ -131,6 +134,17 @@ export default function TocHubScreen() {
             detail="Seating is limited — families first"
             accent
             onPress={() => openWeb(TOC_TICKETS)}
+          />
+          {/*
+            Beside tickets, where people are already thinking about the event — and not on the bracket
+            screen or in any alert. "Limited run" rather than a count: the store tracks in-stock as a
+            yes or no, not a quantity, so a number here would be a promise nothing keeps.
+          */}
+          <Row
+            icon="shirt"
+            title="Official TOC tee"
+            detail="$30 — limited run"
+            onPress={() => openWeb(TOC_TEE)}
           />
           <Row
             icon="information-circle"
