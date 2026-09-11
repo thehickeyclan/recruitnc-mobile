@@ -157,7 +157,7 @@ export function PoolSubmit({
   if (!window) {
     return (
       <View style={styles.card}>
-        <Text style={styles.title}>Pool unavailable</Text>
+        <Text style={styles.title}>TOC Madness unavailable</Text>
         <Text style={styles.detail}>
           {loadError ?? "Could not reach TOC Madness."} Your picks are saved on this phone either way.
         </Text>
@@ -172,7 +172,7 @@ export function PoolSubmit({
       <View style={styles.card}>
         <Text style={styles.title}>{submitted ? "Your entry is locked in" : "Entries are not open yet"}</Text>
         <Text style={styles.detail}>
-          {window.reason ?? `The pool opens ${dayLabel(window.opensAt)}.`}
+          {window.reason ?? `TOC Madness opens ${dayLabel(window.opensAt)}.`}
         </Text>
         {privacyNote}
         {leaderboard}
