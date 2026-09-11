@@ -159,7 +159,7 @@ export default function MoreScreen() {
           <Pressable style={styles.row} onPress={() => router.push("/toc-bracket")}>
             <View style={styles.rowBody}>
               <Text style={styles.rowTitle}>Your Bracket</Text>
-              <Text style={styles.rowDetail}>Seed the field yourself and see the draw</Text>
+              <Text style={styles.rowDetail}>The official draw and your TOC Madness picks</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </Pressable>

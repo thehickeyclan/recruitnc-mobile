@@ -86,7 +86,7 @@ export function TocMadness({
           number="2"
           when={seedsOut ? "OPEN NOW" : "THE MOMENT THEY LAND"}
           title="Submit your bracket"
-          detail="Call every bout at every weight. One entry each, and you can change it until the wrestling starts."
+          detail="Call every bout at every weight. One entry each, and you can change your picks until entries lock."
           live={seedsOut}
         />
         <Step
