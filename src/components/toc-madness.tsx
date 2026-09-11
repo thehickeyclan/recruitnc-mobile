@@ -85,8 +85,8 @@ export function TocMadness({
         <Step
           number="2"
           when={seedsOut ? "OPEN NOW" : "THE MOMENT THEY LAND"}
-          title="Submit your bracket"
-          detail="Call every bout at every weight. One entry each, and you can change your picks until entries lock."
+          title="Fill out your bracket"
+          detail="Pick every bout at every weight. One entry each, and you can change your picks until entries lock."
           live={seedsOut}
         />
         <Step
@@ -105,7 +105,7 @@ export function TocMadness({
       {seedsOut ? (
         <Pressable style={styles.cta} onPress={onStart}>
           <Ionicons name="git-branch" size={16} color={colors.ink} />
-          <Text style={styles.ctaText}>Submit your bracket</Text>
+          <Text style={styles.ctaText}>Fill out your bracket</Text>
         </Pressable>
       ) : alertsOn ? (
         <Pressable style={styles.cta} onPress={onSeeField}>

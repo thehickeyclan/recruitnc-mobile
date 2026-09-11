@@ -49,7 +49,7 @@ export function TocMadnessCard({
 
       <Pressable style={styles.cta} onPress={seedsOut ? onStartBracket : onSeeField}>
         <Ionicons name={seedsOut ? "git-branch" : "people"} size={16} color={colors.ink} />
-        <Text style={styles.ctaText}>{seedsOut ? "Pick your bracket" : "See who's in"}</Text>
+        <Text style={styles.ctaText}>{seedsOut ? "Fill out your bracket" : "See who's in"}</Text>
       </Pressable>
 
       <Pressable
