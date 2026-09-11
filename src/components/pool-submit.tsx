@@ -72,7 +72,7 @@ export function PoolSubmit({
       // A pool that cannot be reached must not read as a pool that is open. Failing to the open
       // state offered a submit button the server would refuse, which is worse than saying so.
       setWindow(null)
-      setLoadError(e instanceof Error ? e.message : "Could not reach the pool.")
+      setLoadError(e instanceof Error ? e.message : "Could not reach TOC Madness.")
     } finally {
       setLoaded(true)
     }
@@ -102,7 +102,7 @@ export function PoolSubmit({
           `${result.picksAccepted} of ${result.boutsInDraw} bouts were accepted. Reopen this weight and fill in the rest before the deadline.`,
         )
       } else {
-        Alert.alert("Bracket submitted", `Your ${weightClass} lbs bracket is in the pool.`)
+        Alert.alert("Bracket submitted", `Your ${weightClass} lbs bracket is in TOC Madness.`)
       }
     } catch (e) {
       Alert.alert("Not submitted", e instanceof Error ? e.message : "Could not submit your bracket.")
@@ -138,9 +138,9 @@ export function PoolSubmit({
   if (!session) {
     return (
       <View style={styles.card}>
-        <Text style={styles.title}>Enter the pool</Text>
+        <Text style={styles.title}>Enter TOC Madness</Text>
         <Text style={styles.detail}>
-          Sign in to submit this bracket once the official seeds are released. Playing with it needs
+          Sign in to submit your picks for TOC Madness. Picking winners here needs
           no account.
         </Text>
         <Pressable style={styles.secondary} onPress={() => router.push("/sign-in")}>
@@ -159,7 +159,7 @@ export function PoolSubmit({
       <View style={styles.card}>
         <Text style={styles.title}>Pool unavailable</Text>
         <Text style={styles.detail}>
-          {loadError ?? "Could not reach the pool."} Your picks are saved on this phone either way.
+          {loadError ?? "Could not reach TOC Madness."} Your picks are saved on this phone either way.
         </Text>
         {privacyNote}
         {leaderboard}
