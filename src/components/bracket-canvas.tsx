@@ -29,6 +29,13 @@ type Props = {
    * that resolution happens in the app — so it arrives here rather than in the geometry.
    */
   resolved?: Record<number, { top: BracketSlotDisplay; bottom: BracketSlotDisplay }>
+  /**
+   * Bout number → how the pick on that bout is holding up against the real result.
+   *
+   * Only ever set on somebody's own TOC Madness bracket. The official bracket has no verdicts:
+   * there is nothing to be right or wrong about, so its winners stay gold.
+   */
+  verdicts?: Record<number, "correct" | "wrong" | "dead" | "pending">
   onPickWinner: (boutNumber: number, competitorId: string) => void
   /**
    * False lays the canvas out at its full natural width with no ScrollView around it.
@@ -44,28 +51,51 @@ type Props = {
 function Slot({
   slot,
   won,
+  verdict,
   onPress,
   isTop,
   height,
 }: {
   slot: BracketSlotDisplay
   won: boolean
+  verdict?: "correct" | "wrong" | "dead" | "pending"
   onPress: (() => void) | null
   isTop: boolean
   height: number
 }) {
+  // Gold means "this is who you picked". Green, red and grey answer the next question — whether
+  // the tournament agreed — and only ever appear on the slot that was picked.
+  const judged = won ? verdict : undefined
   return (
     <Pressable
       disabled={!onPress}
       onPress={onPress ?? undefined}
-      style={[styles.slot, { height }, isTop && styles.slotDivider, won && styles.slotWon]}
+      style={[
+        styles.slot,
+        { height },
+        isTop && styles.slotDivider,
+        won && styles.slotWon,
+        judged === "correct" && styles.slotCorrect,
+        judged === "wrong" && styles.slotWrong,
+        judged === "dead" && styles.slotDead,
+      ]}
     >
       <View style={[styles.seedBadge, slot.seed == null && styles.seedBadgeEmpty]}>
         <Text style={styles.seedText}>{slot.seed ?? "–"}</Text>
       </View>
 
       <View style={styles.slotBody}>
-        <Text style={[styles.slotName, slot.isOpen && styles.slotOpen, won && styles.slotNameWon]} numberOfLines={1}>
+        <Text
+          style={[
+            styles.slotName,
+            slot.isOpen && styles.slotOpen,
+            won && styles.slotNameWon,
+            judged === "correct" && styles.slotNameCorrect,
+            judged === "wrong" && styles.slotNameWrong,
+            judged === "dead" && styles.slotNameDead,
+          ]}
+          numberOfLines={1}
+        >
           {slot.name}
         </Text>
         {slot.subtitle ? (
@@ -84,12 +114,14 @@ function MatchCard({
   match,
   layout,
   winnerId,
+  verdict,
   resolved,
   onPickWinner,
 }: {
   match: BracketLayoutMatch
   layout: BracketLayout
   winnerId: string | null
+  verdict?: "correct" | "wrong" | "dead" | "pending"
   resolved?: { top: BracketSlotDisplay; bottom: BracketSlotDisplay }
   onPickWinner: Props["onPickWinner"]
 }) {
@@ -115,6 +147,7 @@ function MatchCard({
         isTop
         height={slotHeight}
         won={winnerId != null && winnerId === top.competitorId}
+        verdict={verdict}
         onPress={pressFor(top)}
       />
       <Slot
@@ -122,13 +155,14 @@ function MatchCard({
         isTop={false}
         height={slotHeight}
         won={winnerId != null && winnerId === bottom.competitorId}
+        verdict={verdict}
         onPress={pressFor(bottom)}
       />
     </View>
   )
 }
 
-export function BracketCanvas({ layout, winners, resolved, onPickWinner, scroll = true }: Props) {
+export function BracketCanvas({ layout, winners, resolved, verdicts, onPickWinner, scroll = true }: Props) {
   // Room for the round labels above the first card.
   const labelBand = 26
 
@@ -156,6 +190,7 @@ export function BracketCanvas({ layout, winners, resolved, onPickWinner, scroll 
                 match={m}
                 layout={layout}
                 winnerId={m.boutNumber != null ? (winners[m.boutNumber] ?? null) : null}
+                verdict={m.boutNumber != null ? verdicts?.[m.boutNumber] : undefined}
                 resolved={m.boutNumber != null ? resolved?.[m.boutNumber] : undefined}
                 onPickWinner={onPickWinner}
               />
@@ -210,6 +245,11 @@ const styles = StyleSheet.create({
   slot: { flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: space.sm },
   slotDivider: { borderBottomWidth: 1, borderBottomColor: colors.line },
   slotWon: { backgroundColor: "rgba(211, 181, 116, 0.16)" },
+  // Right, wrong, and gone. Tinted rather than block-filled so the name stays the loudest thing
+  // on the card, and a colour-blind reader still has the gold "this was my pick" cue underneath.
+  slotCorrect: { backgroundColor: "rgba(52, 199, 89, 0.18)" },
+  slotWrong: { backgroundColor: "rgba(211, 47, 47, 0.16)" },
+  slotDead: { backgroundColor: "rgba(255, 255, 255, 0.04)", opacity: 0.55 },
 
   seedBadge: {
     width: 20,
@@ -225,6 +265,9 @@ const styles = StyleSheet.create({
   slotBody: { flex: 1 },
   slotName: { ...type.label, color: colors.text },
   slotNameWon: { color: colors.gold, fontWeight: "700" },
+  slotNameCorrect: { color: "#34C759", fontWeight: "700" },
+  slotNameWrong: { color: "#FF6B6B", fontWeight: "700", textDecorationLine: "line-through" },
+  slotNameDead: { color: colors.textMuted, fontWeight: "600", textDecorationLine: "line-through" },
   slotOpen: { color: colors.textMuted, fontStyle: "italic" },
   slotSub: { ...type.caption, color: colors.textMuted, fontSize: 9 },
   slotSubWon: { color: colors.textSecondary },

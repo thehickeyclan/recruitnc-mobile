@@ -156,10 +156,10 @@ export default function MoreScreen() {
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </Pressable>
           <View style={styles.rowDivider} />
-          <Pressable style={styles.row} onPress={() => router.push("/toc-bracket")}>
+          <Pressable style={styles.row} onPress={() => router.push("/toc-results")}>
             <View style={styles.rowBody}>
               <Text style={styles.rowTitle}>Official Brackets</Text>
-              <Text style={styles.rowDetail}>The official draw and your TOC Madness picks</Text>
+              <Text style={styles.rowDetail}>Every weight&apos;s draw and results as they happen</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </Pressable>

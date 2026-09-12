@@ -67,6 +67,7 @@ export default function RootLayout() {
         <Stack.Screen name="clubs" options={{ presentation: "modal" }} />
         <Stack.Screen name="blue-subscription" options={{ presentation: "modal" }} />
         <Stack.Screen name="toc-bracket" options={{ presentation: "modal" }} />
+        <Stack.Screen name="toc-results" options={{ presentation: "modal" }} />
         <Stack.Screen name="sign-in" options={{ presentation: "modal" }} />
       </Stack>
     </>

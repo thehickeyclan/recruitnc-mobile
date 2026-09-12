@@ -115,7 +115,13 @@ export default function TocHubScreen() {
           <Row
             icon="git-branch"
             title="Official Brackets"
-            detail="Every weight's draw — make your TOC Madness picks"
+            detail="Every weight's draw and results as they happen"
+            onPress={() => router.push("/toc-results")}
+          />
+          <Row
+            icon="create"
+            title="TOC Madness"
+            detail="Your picks, marked right or wrong as bouts finish"
             onPress={() => router.push("/toc-bracket")}
           />
           <Row

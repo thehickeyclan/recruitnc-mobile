@@ -59,7 +59,7 @@ export default function TocLeaderboardScreen() {
           {/* The other half of the pair — see the bracket the standing came from, without going home. */}
           <View style={styles.headerActions}>
             <Pressable
-              onPress={() => router.replace("/toc-bracket")}
+              onPress={() => router.replace("/toc-results")}
               hitSlop={10}
               accessibilityRole="button"
               style={styles.crossLink}

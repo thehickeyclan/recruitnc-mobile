@@ -123,6 +123,53 @@ export async function buildBracketPreview(
 /** Thrown when the tournament simply has not published brackets yet. */
 export class BracketNotReleasedError extends Error {}
 
+export type BracketOutcome = { method: string | null; winnerScore: number | null; loserScore: number | null }
+
+export type BracketResults = {
+  weightClass: number
+  /** Bout number → who actually won it. The same shape the simulation advances on. */
+  winners: Record<number, string>
+  outcomes: Record<number, BracketOutcome>
+  recorded: number
+  totalBouts: number
+  lastUpdated: string | null
+}
+
+/**
+ * What has actually happened at a weight, as recorded at the mats.
+ *
+ * Separate from the draw on purpose: the draw is fixed once brackets are locked, results arrive
+ * all weekend, and the screens that want them refresh on their own clock.
+ */
+export async function fetchBracketResults(weightClass: number, signal?: AbortSignal): Promise<BracketResults> {
+  if (!BASE) throw new Error("This build has no EXPO_PUBLIC_WEB_BASE_URL.")
+
+  const response = await fetch(`${BASE}/api/toc/brackets/results?weightClass=${weightClass}`, {
+    headers: { ...clientHeader(), Accept: "application/json" },
+    signal: signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  })
+
+  const data = (await response.json().catch(() => null)) as
+    | (BracketResults & { error?: string; released?: boolean })
+    | null
+
+  if (data && data.released === false) {
+    throw new BracketNotReleasedError(data.error ?? "Brackets have not been released yet.")
+  }
+  if (!response.ok || !data || data.error) {
+    throw new Error(data?.error ?? "Could not load results.")
+  }
+
+  return {
+    weightClass,
+    winners: data.winners ?? {},
+    outcomes: data.outcomes ?? {},
+    recorded: Number(data.recorded) || 0,
+    totalBouts: Number(data.totalBouts) || 0,
+    lastUpdated: data.lastUpdated ?? null,
+  }
+}
+
 /** Bouts grouped in the order the rounds actually happen, for a phone-shaped read. */
 export function boutsByRound(draw: BracketDraw): Array<{ round: string; bouts: BracketBout[] }> {
   const order: string[] = []

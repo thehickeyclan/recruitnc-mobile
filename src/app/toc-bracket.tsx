@@ -10,11 +10,14 @@ import { compareBySurname, fetchTocField, type TocField, type TocFieldAthlete } 
 import {
   BracketNotReleasedError,
   buildBracketPreview,
+  fetchBracketResults,
   slotLabel,
   slotSeed,
   type BracketPreview,
+  type BracketResults,
   type BracketSlotDisplay,
 } from "@/lib/toc-bracket"
+import { pickVerdicts, verdictTally, type PickVerdict } from "@/lib/pick-verdicts"
 import { BracketCanvas } from "@/components/bracket-canvas"
 import { shareBracketImage } from "@/lib/share-bracket"
 import { championOf, pickProgress, simulate, updatePick, type SimulationPicks } from "@/lib/bracket-simulation"
@@ -52,6 +55,7 @@ function BracketCard({
   layout,
   winners,
   resolved,
+  verdicts,
   onPickWinner,
   scroll = true,
   cardRef,
@@ -63,6 +67,8 @@ function BracketCard({
   layout: BracketPreview["layout"]
   winners: Record<number, string | null>
   resolved: Record<number, { top: BracketSlotDisplay; bottom: BracketSlotDisplay }>
+  /** How each pick has held up, once results start landing. Absent before the first bout. */
+  verdicts?: Record<number, PickVerdict>
   onPickWinner: (boutNumber: number, competitorId: string) => void
   scroll?: boolean
   cardRef?: Ref<View>
@@ -97,6 +103,7 @@ function BracketCard({
           layout={layout.championship}
           winners={winners}
           resolved={resolved}
+          verdicts={verdicts}
           onPickWinner={onPickWinner}
           scroll={scroll}
         />
@@ -110,6 +117,7 @@ function BracketCard({
               layout={layout.consolation}
               winners={winners}
               resolved={resolved}
+              verdicts={verdicts}
               onPickWinner={onPickWinner}
               scroll={scroll}
             />
@@ -129,6 +137,8 @@ export default function TocBracketScreen() {
   const [orders, setOrders] = useState<Orders>({})
   const [allPicks, setAllPicks] = useState<AllPicks>({})
   const [preview, setPreview] = useState<BracketPreview | null>(null)
+  /** What actually happened, once the tournament starts. Null until a weight has been asked for. */
+  const [results, setResults] = useState<BracketResults | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -233,6 +243,23 @@ export default function TocBracketScreen() {
     }
   }, [weight, seeded, athletes])
 
+  /**
+   * Results arrive all weekend; the draw does not.
+   *
+   * Fetched apart from the bracket so a tap never waits on them, and so a weekend outage on this
+   * endpoint costs the colours rather than the ability to pick.
+   */
+  useEffect(() => {
+    if (weight == null) return
+    let cancelled = false
+    void fetchBracketResults(weight)
+      .then((r) => !cancelled && setResults(r))
+      .catch(() => !cancelled && setResults(null))
+    return () => {
+      cancelled = true
+    }
+  }, [weight])
+
   const simulated = useMemo(
     () => (preview ? simulate(preview.draw, picks) : null),
     [preview, picks],
@@ -298,6 +325,16 @@ export default function TocBracketScreen() {
   const champion = simulated ? championOf(simulated, picks) : null
   const championName = champion ? (byId.get(champion)?.name ?? null) : null
 
+  /**
+   * How the picks are holding up. Judged against the official draw rather than the simulated one:
+   * who can still reach a bout is a fact about the tournament, not about what this person picked.
+   */
+  const verdicts = useMemo(
+    () => (preview && results && results.recorded > 0 ? pickVerdicts(preview.draw, results.winners, picks) : undefined),
+    [preview, results, picks],
+  )
+  const tally = useMemo(() => (verdicts ? verdictTally(verdicts) : null), [verdicts])
+
   const tapSlot = useCallback(
     (boutNumber: number, athleteId: string | null) => {
       if (!simulated || !athleteId) return
@@ -327,7 +364,7 @@ export default function TocBracketScreen() {
           <View style={styles.flexShrink}>
             <Text style={styles.eyebrow}>TOURNAMENT OF CHAMPIONS</Text>
             <Text style={styles.title} maxFontSizeMultiplier={1.4}>
-              Official Brackets
+              TOC Madness
             </Text>
           </View>
           {/*
@@ -491,6 +528,17 @@ export default function TocBracketScreen() {
                     </View>
                   )}
 
+                  {tally ? (
+                    <View style={styles.notice}>
+                      <Ionicons name="stats-chart" size={15} color={colors.gold} />
+                      <Text style={styles.noticeText}>
+                        {tally.correct} right · {tally.wrong} wrong
+                        {tally.dead > 0 ? ` · ${tally.dead} out of it` : ""}
+                        {tally.pending > 0 ? ` · ${tally.pending} still live` : ""}
+                      </Text>
+                    </View>
+                  ) : null}
+
                   <BracketCard
                     weight={preview.weightClass}
                     championName={championName}
@@ -498,6 +546,7 @@ export default function TocBracketScreen() {
                     layout={preview.layout}
                     winners={winnersByBout}
                     resolved={resolvedByBout}
+                    verdicts={verdicts}
                     onPickWinner={tapSlot}
                   />
 
@@ -514,6 +563,7 @@ export default function TocBracketScreen() {
                       layout={preview.layout}
                       winners={winnersByBout}
                       resolved={resolvedByBout}
+                      verdicts={verdicts}
                       onPickWinner={tapSlot}
                     />
                   </View>
