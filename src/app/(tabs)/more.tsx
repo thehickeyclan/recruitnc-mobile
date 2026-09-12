@@ -8,6 +8,7 @@ import { colors, radius, space, type } from "@/theme/tokens"
 import { router } from "expo-router"
 import { DEFAULT_PREFS, PushUnavailableError, registerForPush, syncDevice, withAlertDefaults, type AlertPrefs } from "@/lib/push"
 import { deleteAccount, signOut, useSession } from "@/lib/auth"
+import { bracketsAreLive, bracketsLabel } from "@/lib/toc-live"
 
 const PREFS_KEY = "recruitnc.alertPrefs"
 const WEB = process.env.EXPO_PUBLIC_WEB_BASE_URL
@@ -158,7 +159,7 @@ export default function MoreScreen() {
           <View style={styles.rowDivider} />
           <Pressable style={styles.row} onPress={() => router.push("/toc-results")}>
             <View style={styles.rowBody}>
-              <Text style={styles.rowTitle}>Official Brackets</Text>
+              <Text style={styles.rowTitle}>{bracketsLabel(bracketsAreLive())}</Text>
               <Text style={styles.rowDetail}>Every weight&apos;s draw and results as they happen</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />

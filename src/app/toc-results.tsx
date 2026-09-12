@@ -16,6 +16,7 @@ import {
   type BracketSlotDisplay,
 } from "@/lib/toc-bracket"
 import { fetchTocField, type TocField } from "@/lib/toc-field"
+import { bracketsAreLive, bracketsLabel } from "@/lib/toc-live"
 import { simulate } from "@/lib/bracket-simulation"
 import { colors, radius, space, type } from "@/theme/tokens"
 
@@ -174,6 +175,14 @@ export default function TocResultsScreen() {
     return out
   }, [official, layoutSlots])
 
+  /**
+   * The server's answer or the clock, whichever says live.
+   *
+   * The server knows if the mats started early; the clock still works on a phone that cannot
+   * reach it. Either one is enough to stop calling a scoreboard a draw.
+   */
+  const live = bracketsAreLive(new Date(), results?.recorded ?? 0) || results?.live === true
+
   const championName = useMemo(() => {
     const final = [...(official?.bouts ?? [])]
       .filter((b) => /championship/i.test(b.roundLabel))
@@ -188,9 +197,17 @@ export default function TocResultsScreen() {
         <View style={styles.headerRow}>
           <View style={styles.flexShrink}>
             <Text style={styles.eyebrow}>TOURNAMENT OF CHAMPIONS</Text>
-            <Text style={styles.title} maxFontSizeMultiplier={1.4}>
-              Official Brackets
-            </Text>
+            <View style={styles.titleLine}>
+              <Text style={styles.title} maxFontSizeMultiplier={1.4}>
+                {bracketsLabel(live)}
+              </Text>
+              {live ? (
+                <View style={styles.livePill}>
+                  <View style={styles.liveDot} />
+                  <Text style={styles.liveText}>LIVE</Text>
+                </View>
+              ) : null}
+            </View>
           </View>
           <View style={styles.headerActions}>
             <Pressable
@@ -294,7 +311,21 @@ const styles = StyleSheet.create({
   crossLink: { flexDirection: "row", alignItems: "center", gap: 4 },
   crossLinkText: { ...type.label, color: colors.gold, fontWeight: "700" },
   eyebrow: { ...type.caption, color: colors.red, letterSpacing: 1.4, fontWeight: "700" },
+  titleLine: { flexDirection: "row", alignItems: "center", gap: space.sm },
   title: { ...type.title, color: colors.text },
+  livePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: space.sm,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+    backgroundColor: "rgba(52, 199, 89, 0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(52, 199, 89, 0.5)",
+  },
+  liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#34C759" },
+  liveText: { ...type.caption, color: "#34C759", fontWeight: "800", letterSpacing: 1 },
 
   chips: { gap: space.xs, paddingVertical: space.xs, paddingRight: space.lg },
   chip: {

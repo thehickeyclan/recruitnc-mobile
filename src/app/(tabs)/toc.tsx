@@ -6,6 +6,7 @@ import * as WebBrowser from "expo-web-browser"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors, radius, space, type } from "@/theme/tokens"
 import { fetchTocField, type TocField } from "@/lib/toc-field"
+import { bracketsAreLive, bracketsLabel } from "@/lib/toc-live"
 import { useAlertPrefs } from "@/lib/alert-prefs"
 import { TocMadness } from "@/components/toc-madness"
 
@@ -41,12 +42,15 @@ function Row({
   detail,
   onPress,
   accent,
+  live,
 }: {
   icon: keyof typeof Ionicons.glyphMap
   title: string
   detail: string
   onPress: () => void
   accent?: boolean
+  /** A green dot beside the title, for the bracket row once the tournament is under way. */
+  live?: boolean
 }) {
   return (
     <Pressable style={[styles.row, accent && styles.rowAccent]} onPress={onPress}>
@@ -54,7 +58,10 @@ function Row({
         <Ionicons name={icon} size={18} color={accent ? colors.ink : colors.gold} />
       </View>
       <View style={styles.flex}>
-        <Text style={[styles.rowTitle, accent && styles.rowTitleAccent]}>{title}</Text>
+        <View style={styles.rowTitleLine}>
+          {live ? <View style={styles.liveDot} /> : null}
+          <Text style={[styles.rowTitle, accent && styles.rowTitleAccent]}>{title}</Text>
+        </View>
         <Text style={[styles.rowDetail, accent && styles.rowDetailAccent]}>{detail}</Text>
       </View>
       <Ionicons name="chevron-forward" size={18} color={accent ? colors.ink : colors.textMuted} />
@@ -72,6 +79,9 @@ export default function TocHubScreen() {
       .catch(() => undefined)
   }, [])
 
+  // The clock alone here: a row in a tab should not need a network call to know what to call
+  // itself, and the bracket screen it opens takes the server's answer as well.
+  const live = bracketsAreLive()
   const announced = field?.tiles.filter((t) => t.announced).length ?? 0
   const total = field?.tiles.length ?? 0
   const fieldDetail =
@@ -114,8 +124,9 @@ export default function TocHubScreen() {
           />
           <Row
             icon="git-branch"
-            title="Official Brackets"
-            detail="Every weight's draw and results as they happen"
+            title={bracketsLabel(live)}
+            detail={live ? "Results as they happen, weight by weight" : "Every weight's draw and results as they happen"}
+            live={live}
             onPress={() => router.push("/toc-results")}
           />
           <Row
@@ -231,6 +242,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   rowIconAccent: { backgroundColor: "rgba(10, 22, 40, 0.12)" },
+  rowTitleLine: { flexDirection: "row", alignItems: "center", gap: 6 },
+  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#34C759" },
   rowTitle: { ...type.label, color: colors.text, fontWeight: "700" },
   rowTitleAccent: { color: colors.ink },
   rowDetail: { ...type.caption, color: colors.textMuted, marginTop: 2 },

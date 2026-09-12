@@ -127,6 +127,8 @@ export type BracketOutcome = { method: string | null; winnerScore: number | null
 
 export type BracketResults = {
   weightClass: number
+  /** True once weigh-ins are done, or as soon as a bout is recorded. */
+  live: boolean
   /** Bout number → who actually won it. The same shape the simulation advances on. */
   winners: Record<number, string>
   outcomes: Record<number, BracketOutcome>
@@ -162,6 +164,7 @@ export async function fetchBracketResults(weightClass: number, signal?: AbortSig
 
   return {
     weightClass,
+    live: data.live === true,
     winners: data.winners ?? {},
     outcomes: data.outcomes ?? {},
     recorded: Number(data.recorded) || 0,
