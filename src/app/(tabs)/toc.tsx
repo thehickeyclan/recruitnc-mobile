@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { Image, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native"
+import { Image, Pressable, ScrollView, StyleSheet, Switch, Text, View, type ImageSourcePropType } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { router } from "expo-router"
 import * as WebBrowser from "expo-web-browser"
@@ -36,8 +36,12 @@ function openWeb(url: string) {
   }).catch(() => undefined)
 }
 
+// The FloWrestling event page — every match, live and on demand.
+const TOC_FLO = "https://www.flowrestling.org/nextgen/events/16151556/information"
+
 function Row({
   icon,
+  image,
   title,
   detail,
   onPress,
@@ -45,6 +49,8 @@ function Row({
   live,
 }: {
   icon: keyof typeof Ionicons.glyphMap
+  /** A partner's own mark in place of the icon, e.g. the Flo logo on the stream row. */
+  image?: ImageSourcePropType
   title: string
   detail: string
   onPress: () => void
@@ -54,9 +60,13 @@ function Row({
 }) {
   return (
     <Pressable style={[styles.row, accent && styles.rowAccent]} onPress={onPress}>
-      <View style={[styles.rowIcon, accent && styles.rowIconAccent]}>
-        <Ionicons name={icon} size={18} color={accent ? colors.ink : colors.gold} />
-      </View>
+      {image ? (
+        <Image source={image} style={styles.rowImage} resizeMode="cover" accessibilityIgnoresInvertColors />
+      ) : (
+        <View style={[styles.rowIcon, accent && styles.rowIconAccent]}>
+          <Ionicons name={icon} size={18} color={accent ? colors.ink : colors.gold} />
+        </View>
+      )}
       <View style={styles.flex}>
         <View style={styles.rowTitleLine}>
           {live ? <View style={styles.liveDot} /> : null}
@@ -140,6 +150,14 @@ export default function TocHubScreen() {
             title="Leaderboard"
             detail="How every entry is scoring"
             onPress={() => router.push("/toc-leaderboard")}
+          />
+          {/* With the results rows: someone checking brackets is the person who wants to watch. */}
+          <Row
+            icon="play-circle"
+            image={require("../../../assets/images/flo-logo.png")}
+            title="Watch live on FloWrestling"
+            detail="Every match, with commentary from Ryan Mitchell of The NC Mat"
+            onPress={() => openWeb(TOC_FLO)}
           />
         </View>
 
@@ -242,6 +260,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   rowIconAccent: { backgroundColor: "rgba(10, 22, 40, 0.12)" },
+  rowImage: { width: 34, height: 34, borderRadius: radius.sm },
   rowTitleLine: { flexDirection: "row", alignItems: "center", gap: 6 },
   liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#34C759" },
   rowTitle: { ...type.label, color: colors.text, fontWeight: "700" },
