@@ -20,7 +20,7 @@ import {
 import { pickVerdicts, verdictTally, type PickVerdict } from "@/lib/pick-verdicts"
 import { BracketCanvas } from "@/components/bracket-canvas"
 import { shareBracketImage } from "@/lib/share-bracket"
-import { championOf, pickProgress, simulate, updatePick, type SimulationPicks } from "@/lib/bracket-simulation"
+import { championOf, pickProgress, simulate, stalePicks, updatePick, type SimulationPicks } from "@/lib/bracket-simulation"
 import { PoolSubmit } from "@/components/pool-submit"
 
 const ORDER_KEY = "recruitnc.tocBracketOrders"
@@ -326,6 +326,17 @@ export default function TocBracketScreen() {
   const championName = champion ? (byId.get(champion)?.name ?? null) : null
 
   /**
+   * Picks whose wrestler has left the weight — a withdrawal after entries opened.
+   *
+   * Judged against the saved picks rather than the simulated draw, because the simulation is
+   * exactly what hides this: it drops the pick, the bout renders blank and the picked count falls,
+   * so a bracket that has had a wrestler taken out of it looks like one that was never finished.
+   * Nothing else on this screen can say it before the tournament starts — the verdict colours need
+   * results, and results do not exist until Friday.
+   */
+  const stale = useMemo(() => (preview ? stalePicks(preview.draw, picks) : []), [preview, picks])
+
+  /**
    * How the picks are holding up. Judged against the official draw rather than the simulated one:
    * who can still reach a bout is a fact about the tournament, not about what this person picked.
    */
@@ -503,6 +514,25 @@ export default function TocBracketScreen() {
                     </Pressable>
                   </View>
 
+                  {/*
+                    Above the bracket, not inside BracketCard: the card is also the image people
+                    save and send, and "your picks are broken" does not belong in a keepsake.
+                    Cannot name the wrestler — they are gone from the draw and from the field, so
+                    the app no longer holds their name anywhere on this screen.
+                  */}
+                  {preview.official && stale.length > 0 ? (
+                    <View style={[styles.notice, styles.noticeAlert]}>
+                      <Ionicons name="alert-circle" size={15} color={colors.red} />
+                      <Text style={styles.noticeText}>
+                        {stale.length === 1
+                          ? "One of your picks is no longer valid: a wrestler you picked has withdrawn from this weight."
+                          : `${stale.length} of your picks are no longer valid: a wrestler you picked has withdrawn from this weight.`}{" "}
+                        Those bouts are blank on your bracket now. Pick them again and update your entry before
+                        entries lock.
+                      </Text>
+                    </View>
+                  ) : null}
+
                   {!preview?.official ? (
                     <View style={styles.notice}>
                       <Ionicons name="information-circle" size={15} color={colors.gold} />
@@ -572,6 +602,7 @@ export default function TocBracketScreen() {
                     weightClass={preview.weightClass}
                     picks={picks}
                     complete={progress.total > 0 && progress.picked === progress.total}
+                    staleCount={stale.length}
                   />
 
                   {/* Deliberately quieter than Submit, and directly under the pool card, because a
@@ -668,6 +699,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md, padding: space.md,
   },
   noticeText: { ...type.label, color: colors.textSecondary, flex: 1 },
+  noticeAlert: { borderColor: colors.red },
 
   shareCard: { backgroundColor: colors.ink, paddingBottom: space.md, gap: space.sm },
   // Off the left edge rather than hidden: `display: none` and `opacity: 0` both stop it being

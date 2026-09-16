@@ -115,6 +115,27 @@ export function sanitizePicks(draw: BracketDraw, picks: SimulationPicks): Simula
   return next
 }
 
+/**
+ * Picks naming a wrestler who is not in this draw at all.
+ *
+ * Deliberately narrower than what `sanitizePicks` drops. That drops picks made impossible by
+ * another pick — change the earlier pick and they are live again. These cannot come back: a
+ * wrestler who withdraws after entries open is removed from the locked draw, so every pick naming
+ * them scores nothing. The bracket already drops them silently, which renders those bouts blank
+ * and reads as picks never made rather than picks taken away.
+ *
+ * Returns bout numbers, so a screen can say how many there are and send someone back to them.
+ */
+export function stalePicks(draw: BracketDraw, picks: SimulationPicks): number[] {
+  return Object.entries(picks)
+    .filter(([boutNumber, athleteId]) => {
+      if (!athleteId || !isPlaceholder(draw, athleteId)) return false
+      return draw.bouts.some((bout) => bout.boutNumber === Number(boutNumber))
+    })
+    .map(([boutNumber]) => Number(boutNumber))
+    .sort((a, b) => a - b)
+}
+
 /** Tapping the wrestler already picked clears the pick, so a tap is its own undo. */
 export function updatePick(
   draw: BracketDraw,

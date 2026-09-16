@@ -36,10 +36,13 @@ export function PoolSubmit({
   weightClass,
   picks,
   complete,
+  staleCount = 0,
 }: {
   weightClass: number
   picks: Record<number, string>
   complete: boolean
+  /** Bouts whose wrestler has withdrawn. A submitted entry holding these is not really done. */
+  staleCount?: number
 }) {
   const { session, loading: sessionLoading } = useSession()
   const [window, setWindow] = useState<PoolWindow | null>(null)
@@ -184,11 +187,18 @@ export function PoolSubmit({
     <View style={styles.card}>
       <Text style={styles.title}>{submitted ? "Submitted" : "Enter TOC Madness"}</Text>
       <Text style={styles.detail}>
-        {submitted
-          ? `Your ${weightClass} lbs bracket is in. You can change it until ${dayLabel(window.deadline)}.`
-          : complete
-            ? `One entry per weight. You can change it until ${dayLabel(window.deadline)}.`
-            : "Pick every bout, then submit."}
+        {/*
+          A submitted entry holding a withdrawn wrestler must not read as finished. "Your bracket
+          is in" is true of the record and useless to the person: those bouts score nothing, and
+          the only thing that fixes them is picking again and submitting before the deadline.
+        */}
+        {staleCount > 0
+          ? `${staleCount === 1 ? "One bout" : `${staleCount} bouts`} lost the wrestler you picked, so ${staleCount === 1 ? "it scores" : "they score"} nothing as ${staleCount === 1 ? "it stands" : "they stand"}. Pick again above, then update your entry before ${dayLabel(window.deadline)}.`
+          : submitted
+            ? `Your ${weightClass} lbs bracket is in. You can change it until ${dayLabel(window.deadline)}.`
+            : complete
+              ? `One entry per weight. You can change it until ${dayLabel(window.deadline)}.`
+              : "Pick every bout, then submit."}
       </Text>
 
       {/* The tiebreaker. Shown while the pool is open, because it is required to submit and

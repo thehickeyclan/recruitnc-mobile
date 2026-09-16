@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { boutParticipants, championOf, sanitizePicks, simulate, updatePick } from "./bracket-simulation"
+import { boutParticipants, championOf, sanitizePicks, simulate, stalePicks, updatePick } from "./bracket-simulation"
 import type { BracketDraw } from "./toc-bracket"
 
 /**
@@ -39,6 +39,32 @@ describe("boutParticipants", () => {
   it("leaves a later bout empty until its feeders are decided", () => {
     expect(boutParticipants(draw, { 1: "a" }, 3)).toEqual(["a"])
     expect(boutParticipants(draw, {}, 3)).toEqual([])
+  })
+})
+
+describe("stalePicks", () => {
+  it("flags a pick whose wrestler has left the draw", () => {
+    // What a withdrawal looks like from here: the wrestler is gone from `participants` entirely,
+    // so the id in a saved pick matches nobody.
+    expect(stalePicks(draw, { 1: "a", 3: "withdrew" })).toEqual([3])
+  })
+
+  it("does not flag a pick that another pick merely made impossible", () => {
+    // "d" loses bout 1 under these picks, so picking him for the final is impossible — but he is
+    // still in the tournament. Change bout 1 and the pick is live again, so it is not stale.
+    expect(stalePicks(draw, { 1: "a", 3: "d" })).toEqual([])
+  })
+
+  it("flags an open spot, which was never a real wrestler", () => {
+    expect(stalePicks(draw, { 1: "__toc_open_1" })).toEqual([1])
+  })
+
+  it("ignores picks against bouts this draw does not have", () => {
+    expect(stalePicks(draw, { 99: "withdrew" })).toEqual([])
+  })
+
+  it("finds nothing when every pick is a wrestler in the draw", () => {
+    expect(stalePicks(draw, { 1: "a", 2: "b", 3: "a" })).toEqual([])
   })
 })
 
