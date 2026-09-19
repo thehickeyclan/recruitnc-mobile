@@ -22,6 +22,8 @@ import { BracketCanvas } from "@/components/bracket-canvas"
 import { shareBracketImage } from "@/lib/share-bracket"
 import { championOf, pickProgress, simulate, stalePicks, updatePick, type SimulationPicks } from "@/lib/bracket-simulation"
 import { PoolSubmit } from "@/components/pool-submit"
+import { useSession } from "@/lib/auth"
+import { fetchPoolState, type PoolEntry, type PoolWindow } from "@/lib/toc-pool"
 
 const ORDER_KEY = "recruitnc.tocBracketOrders"
 const PICKS_KEY = "recruitnc.tocBracketPicks"
@@ -130,6 +132,10 @@ function BracketCard({
   )
 }
 
+
+/** TOC Madness picks locked Friday 18 September 2026, 5:45 PM ET — used only when signed out. */
+const FALLBACK_POOL_DEADLINE = Date.parse("2026-09-18T17:45:00-04:00")
+
 export default function TocBracketScreen() {
   const params = useLocalSearchParams<{ weight?: string }>()
   const [field, setField] = useState<TocField | null>(null)
@@ -186,7 +192,44 @@ export default function TocBracketScreen() {
     [orders, key, byId],
   )
 
-  const picks = allPicks[key] ?? {}
+  const localPicks = allPicks[key] ?? {}
+
+  /*
+   * After the deadline this screen shows the entry that counts, and nothing else.
+   *
+   * The bracket is also a play-along simulator, so it kept taking taps after picks locked at 5:45 —
+   * people advanced wrestlers, saw their bracket change, and reasonably asked why a locked contest
+   * let them edit. The server had refused every save; the screen just never said so. Once the
+   * deadline passes the picks shown are the saved entry from the server, read-only, under a banner.
+   */
+  const { session } = useSession()
+  const [poolWindow, setPoolWindow] = useState<PoolWindow | null>(null)
+  const [myEntries, setMyEntries] = useState<PoolEntry[]>([])
+  useEffect(() => {
+    if (!session) return
+    let cancelled = false
+    void fetchPoolState()
+      .then((state) => {
+        if (cancelled) return
+        setPoolWindow(state.window)
+        setMyEntries(state.entries)
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [session])
+  // Signed out, the pool window is not ours to read, so the published deadline stands in for it —
+  // otherwise everyone without an account still got a tappable bracket after the lock.
+  const deadline = poolWindow ? Date.parse(poolWindow.deadline) : FALLBACK_POOL_DEADLINE
+  const locked = poolWindow ? !poolWindow.open && Date.now() > deadline : Date.now() > deadline
+  const savedEntry = myEntries.find((entry) => entry.weight_class === weight) ?? null
+  const picks = useMemo<SimulationPicks>(() => {
+    if (!locked) return localPicks
+    const out: SimulationPicks = {}
+    for (const [bout, athleteId] of Object.entries(savedEntry?.picks ?? {})) out[Number(bout)] = athleteId
+    return out
+  }, [locked, localPicks, savedEntry])
 
   const saveOrder = useCallback(
     async (next: string[]) => {
@@ -348,10 +391,10 @@ export default function TocBracketScreen() {
 
   const tapSlot = useCallback(
     (boutNumber: number, athleteId: string | null) => {
-      if (!simulated || !athleteId) return
+      if (locked || !simulated || !athleteId) return
       void savePicks(updatePick(simulated, picks, boutNumber, athleteId))
     },
-    [simulated, picks, savePicks],
+    [locked, simulated, picks, savePicks],
   )
 
   const share = useCallback(async () => {
@@ -509,9 +552,11 @@ export default function TocBracketScreen() {
                     <Text style={styles.status}>
                       {championName ? `Your champion: ${championName}` : `${progress.picked} of ${progress.total} picked`}
                     </Text>
-                    <Pressable onPress={reset} hitSlop={8}>
-                      <Text style={styles.resetText}>Start over</Text>
-                    </Pressable>
+                    {locked ? null : (
+                      <Pressable onPress={reset} hitSlop={8}>
+                        <Text style={styles.resetText}>Start over</Text>
+                      </Pressable>
+                    )}
                   </View>
 
                   {/*
@@ -520,7 +565,22 @@ export default function TocBracketScreen() {
                     Cannot name the wrestler — they are gone from the draw and from the field, so
                     the app no longer holds their name anywhere on this screen.
                   */}
-                  {preview.official && stale.length > 0 ? (
+                  {locked ? (
+                    <View style={[styles.notice, styles.noticeAlert]}>
+                      <Ionicons name="lock-closed" size={15} color={colors.gold} />
+                      <Text style={styles.noticeText}>
+                        {!session
+                          ? "Picks locked at 5:45 PM. Sign in to see your entry."
+                          : savedEntry?.submitted
+                          ? `Picks locked at 5:45 PM. This is your ${preview.weightClass} lbs entry — it can no longer be changed.`
+                          : savedEntry
+                            ? `Picks locked at 5:45 PM. Your ${preview.weightClass} lbs picks were saved but never submitted, so they are shown here for reference.`
+                            : `Picks locked at 5:45 PM. You did not enter ${preview.weightClass} lbs.`}
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  {!locked && preview.official && stale.length > 0 ? (
                     <View style={[styles.notice, styles.noticeAlert]}>
                       <Ionicons name="alert-circle" size={15} color={colors.red} />
                       <Text style={styles.noticeText}>
@@ -533,7 +593,7 @@ export default function TocBracketScreen() {
                     </View>
                   ) : null}
 
-                  {!preview?.official ? (
+                  {locked ? null : !preview?.official ? (
                     <View style={styles.notice}>
                       <Ionicons name="information-circle" size={15} color={colors.gold} />
                       <Text style={styles.noticeText}>
