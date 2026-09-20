@@ -183,13 +183,33 @@ export default function TocResultsScreen() {
    */
   const live = bracketsAreLive(new Date(), results?.recorded ?? 0) || results?.live === true
 
-  const championName = useMemo(() => {
-    const final = [...(official?.bouts ?? [])]
-      .filter((b) => /championship/i.test(b.roundLabel))
-      .sort((a, b) => b.boutNumber - a.boutNumber)[0]
-    const id = final?.winnerAthleteId
-    return id ? (official?.participants.find((p) => p.athleteId === id)?.name ?? null) : null
-  }, [official])
+  /**
+   * The podium, not just the winner.
+   *
+   * A champion pill alone answered one of the three questions people ask a finished bracket. Second
+   * is the wrestler the final was against; third is the winner of the third-place bout, which is
+   * its own result and not the consolation final's loser.
+   */
+  const placers = useMemo(() => {
+    const nameOf = (id: string | null | undefined) =>
+      id ? (official?.participants.find((p) => p.athleteId === id)?.name ?? null) : null
+    const bouts = [...(official?.bouts ?? [])]
+    const final = bouts.filter((b) => /championship/i.test(b.roundLabel)).sort((a, b) => b.boutNumber - a.boutNumber)[0]
+    const third = bouts.filter((b) => /3rd/i.test(b.roundLabel)).sort((a, b) => b.boutNumber - a.boutNumber)[0]
+
+    const finalists = final ? resolvedByBout[final.boutNumber] : undefined
+    const runnerUpId =
+      final?.winnerAthleteId && finalists
+        ? [finalists.top.competitorId, finalists.bottom.competitorId].find((id) => id && id !== final.winnerAthleteId) ?? null
+        : null
+
+    return {
+      first: nameOf(final?.winnerAthleteId),
+      second: nameOf(runnerUpId),
+      third: nameOf(third?.winnerAthleteId),
+    }
+  }, [official, resolvedByBout])
+  const championName = placers.first
 
   return (
     <SafeAreaView style={styles.screen} edges={["top"]}>
@@ -265,13 +285,26 @@ export default function TocResultsScreen() {
                 </Text>
                 <Text style={styles.statusSub}>{freshness(results.lastUpdated)}</Text>
               </View>
-              {championName ? (
-                <View style={styles.championPill}>
-                  <Ionicons name="trophy" size={13} color={colors.ink} />
-                  <Text style={styles.championText}>{championName}</Text>
-                </View>
-              ) : null}
             </View>
+
+            {placers.first || placers.second || placers.third ? (
+              <View style={styles.podium}>
+                {[
+                  { place: "1st", name: placers.first, style: styles.pillGold },
+                  { place: "2nd", name: placers.second, style: styles.pillSilver },
+                  { place: "3rd", name: placers.third, style: styles.pillBronze },
+                ]
+                  .filter((p) => p.name)
+                  .map((p) => (
+                    <View key={p.place} style={[styles.placePill, p.style]}>
+                      <Text style={styles.placeRank}>{p.place}</Text>
+                      <Text style={styles.placeName} numberOfLines={1}>
+                        {p.name}
+                      </Text>
+                    </View>
+                  ))}
+              </View>
+            ) : null}
 
             <BracketCanvas
               layout={preview.layout.championship}
@@ -363,6 +396,26 @@ const styles = StyleSheet.create({
   },
   statusStrong: { ...type.label, color: colors.text, fontWeight: "700" },
   statusSub: { ...type.caption, color: colors.textMuted },
+  // Gold, silver and bronze read as places at a glance; the rank still says it in words, because
+  // the difference between the metals is not obvious to everyone looking at a phone.
+  // Inset like the status card above it: this screen's body has no padding of its own, so a row
+  // without a margin ran under both edges and clipped the bronze pill.
+  podium: { flexDirection: "row", flexWrap: "wrap", gap: space.xs, marginHorizontal: space.lg },
+  placePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: space.sm,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+    flexShrink: 1,
+  },
+  pillGold: { backgroundColor: colors.gold },
+  pillSilver: { backgroundColor: "#C7CFD8" },
+  pillBronze: { backgroundColor: "#CC8E5A" },
+  placeRank: { ...type.caption, color: colors.ink, fontWeight: "800", opacity: 0.7, fontSize: 10 },
+  placeName: { ...type.caption, color: colors.ink, fontWeight: "800", flexShrink: 1 },
+
   championPill: {
     flexDirection: "row",
     alignItems: "center",
