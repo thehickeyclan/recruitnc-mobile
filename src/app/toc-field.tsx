@@ -16,6 +16,7 @@ import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors, radius, space, type } from "@/theme/tokens"
 import { openAthleteProfile } from "@/lib/profile-link"
 import { daysUntil, SEEDS_ANNOUNCED } from "@/lib/toc-countdown"
+import { tocIsOver } from "@/lib/toc-live"
 import {
   fetchTocField,
   headlineCredential,
@@ -116,7 +117,7 @@ export default function TocFieldScreen() {
 
   // Before Friday there is no bracket to open, so the button says when there will be.
   const bracketCtaLabel =
-    daysUntil(SEEDS_ANNOUNCED) <= 0 ? "See the bracket" : "Brackets drop Friday at 5:00 PM"
+    tocIsOver() ? "See the bracket and results" : daysUntil(SEEDS_ANNOUNCED) <= 0 ? "See the bracket" : "Brackets drop Friday at 5:00 PM"
 
   return (
     <SafeAreaView style={styles.screen} edges={["top"]}>
@@ -133,7 +134,9 @@ export default function TocFieldScreen() {
           </Pressable>
         </View>
         <Text style={styles.subtitle}>
-          Announced by weight class. Listed alphabetically — the field is not seeded.
+          {tocIsOver()
+            ? "Who was invited, by weight class. Listed alphabetically — the brackets have the seeds."
+            : "Announced by weight class. Listed alphabetically — the field is not seeded."}
         </Text>
 
         {/*
@@ -232,8 +235,9 @@ export default function TocFieldScreen() {
               <Ionicons name="lock-closed-outline" size={34} color={colors.line} />
               <Text style={styles.emptyTitle}>No weights released yet</Text>
               <Text style={styles.emptyText}>
-                Turn on Tournament of Champions alerts and we&apos;ll tell you the moment a weight
-                goes live.
+                {tocIsOver()
+                  ? "Turn on Tournament of Champions alerts and we'll tell you when next year's field is announced."
+                  : "Turn on Tournament of Champions alerts and we'll tell you the moment a weight goes live."}
               </Text>
             </View>
           )}

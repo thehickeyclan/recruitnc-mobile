@@ -16,7 +16,7 @@ import {
   type BracketSlotDisplay,
 } from "@/lib/toc-bracket"
 import { fetchTocField, type TocField } from "@/lib/toc-field"
-import { bracketsAreLive, bracketsLabel } from "@/lib/toc-live"
+import { bracketsLabel, tocIsOver, tocPhase } from "@/lib/toc-live"
 import { simulate } from "@/lib/bracket-simulation"
 import { colors, radius, space, type } from "@/theme/tokens"
 
@@ -113,6 +113,9 @@ export default function TocResultsScreen() {
   }, [weight])
 
   useEffect(() => {
+    // Nothing is being typed in at a mat any more, so a poll every minute forever asks the server
+    // the same question for the rest of the year. Pull to refresh still works.
+    if (tocIsOver()) return
     const timer = setInterval(() => void refreshResults(), REFRESH_MS)
     return () => clearInterval(timer)
   }, [refreshResults])
@@ -176,12 +179,16 @@ export default function TocResultsScreen() {
   }, [official, layoutSlots])
 
   /**
-   * The server's answer or the clock, whichever says live.
+   * The server's answer or the clock, whichever says live — but neither can say live after the
+   * weekend.
    *
-   * The server knows if the mats started early; the clock still works on a phone that cannot
-   * reach it. Either one is enough to stop calling a scoreboard a draw.
+   * The server knows if the mats started early; the clock still works on a phone that cannot reach
+   * it. Either one is enough to stop calling a scoreboard a draw. Once the tournament is over the
+   * clock overrules both, or a server that still reports live keeps a green dot on the screen
+   * indefinitely.
    */
-  const live = bracketsAreLive(new Date(), results?.recorded ?? 0) || results?.live === true
+  const phase = tocPhase(new Date(), results?.recorded ?? 0, results?.live === true)
+  const live = phase === "live"
 
   /**
    * The podium, not just the winner.
@@ -219,7 +226,7 @@ export default function TocResultsScreen() {
             <Text style={styles.eyebrow}>TOURNAMENT OF CHAMPIONS</Text>
             <View style={styles.titleLine}>
               <Text style={styles.title} maxFontSizeMultiplier={1.4}>
-                {bracketsLabel(live)}
+                {bracketsLabel(phase)}
               </Text>
               {live ? (
                 <View style={styles.livePill}>
@@ -335,7 +342,9 @@ export default function TocResultsScreen() {
             ) : null}
 
             <Text style={styles.footnote}>
-              Results are entered at the mats as bouts finish. Pull down to refresh.
+              {phase === "final"
+                ? "Every bout as it was recorded at the mats over the weekend."
+                : "Results are entered at the mats as bouts finish. Pull down to refresh."}
             </Text>
           </>
         ) : null}

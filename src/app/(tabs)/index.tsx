@@ -8,6 +8,7 @@ import { colors, radius, space, type } from "@/theme/tokens"
 import { fetchTocField, type TocField } from "@/lib/toc-field"
 import { fetchCommits, type Commit } from "@/lib/commits"
 import { fetchUpcomingEvents, formatTime, type CalendarEvent } from "@/lib/events"
+import { tocIsOver } from "@/lib/toc-live"
 import { TocMadnessCard } from "@/components/toc-madness-card"
 
 /**
@@ -16,7 +17,7 @@ import { TocMadnessCard } from "@/components/toc-madness-card"
  * The app used to open on the Tournament of Champions itself, which reads oddly for anyone who
  * came for recruiting and lands inside a bracket, and reads worse the day after the tournament
  * ends. So the tournament is the top card here instead: loudest thing on the screen while it is
- * live, gone in September, with a home page still underneath it.
+ * live, the record of the weekend once it is over, with a home page underneath it either way.
  */
 
 const WEB = process.env.EXPO_PUBLIC_WEB_BASE_URL
@@ -97,7 +98,9 @@ export default function HomeScreen() {
 
   useEffect(() => {
     // Each section fills in on its own. One slow call should not hold up the rest of the page.
-    void fetchTocField().then(setField).catch(() => undefined)
+    // The field is asked for only while it is still filling: its one job here is the "N of M
+    // weight classes announced" line, so after the tournament it is a request for nothing.
+    if (!tocIsOver()) void fetchTocField().then(setField).catch(() => undefined)
     void fetchCommits(3).then((r) => setCommits(r.commits.slice(0, 3))).catch(() => undefined)
     void fetchUpcomingEvents().then((r) => setEvents(r.slice(0, 3))).catch(() => undefined)
   }, [])
@@ -126,6 +129,8 @@ export default function HomeScreen() {
           onOpenToc={() => router.push("/toc")}
           onStartBracket={() => router.push("/toc-bracket")}
           onSeeField={() => router.push("/toc-field")}
+          onSeeResults={() => router.push("/toc-results")}
+          onSeeLeaderboard={() => router.push("/toc-leaderboard")}
         />
 
         {events.length > 0 ? (

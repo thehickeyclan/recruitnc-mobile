@@ -6,16 +6,17 @@ import * as WebBrowser from "expo-web-browser"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors, radius, space, type } from "@/theme/tokens"
 import { fetchTocField, type TocField } from "@/lib/toc-field"
-import { bracketsAreLive, bracketsLabel } from "@/lib/toc-live"
+import { bracketsLabel, tocIsOver, tocPhase } from "@/lib/toc-live"
 import { useAlertPrefs } from "@/lib/alert-prefs"
 import { TocMadness } from "@/components/toc-madness"
 
 /**
  * The Tournament of Champions hub — everything about the event in one place.
  *
- * Reached from the card at the top of Home rather than owning a tab. The tournament is the
- * loudest thing in the app until 19 September and nothing at all after it, which is a card's
- * job, not a permanent tab's.
+ * Two shapes. While the tournament is ahead of us this sells it: the pitch card, the field filling
+ * up, tickets, the tee, what to expect. Once it is behind us the same screen is the record of what
+ * happened — brackets, the pool's final standings, the awards — and everything that was a promise
+ * is taken out rather than left to age.
  */
 
 const WEB = process.env.EXPO_PUBLIC_WEB_BASE_URL
@@ -91,7 +92,9 @@ export default function TocHubScreen() {
 
   // The clock alone here: a row in a tab should not need a network call to know what to call
   // itself, and the bracket screen it opens takes the server's answer as well.
-  const live = bracketsAreLive()
+  const phase = tocPhase()
+  const live = phase === "live"
+  const over = phase === "final"
   const announced = field?.tiles.filter((t) => t.announced).length ?? 0
   const total = field?.tiles.length ?? 0
   const fieldDetail =
@@ -111,65 +114,91 @@ export default function TocHubScreen() {
             resizeMode="contain"
           />
           <View style={styles.flex}>
-            <Text style={styles.eyebrow}>SEPTEMBER 18–19, 2026</Text>
+            <Text style={styles.eyebrow}>{over ? "SEPTEMBER 18–19, 2026 · FINAL" : "SEPTEMBER 18–19, 2026"}</Text>
             <Text style={styles.title}>Tournament of Champions</Text>
             <Text style={styles.subtitle}>Hope Community Church · Apex</Text>
           </View>
         </View>
 
-        <TocMadness
-          onStart={() => router.push("/toc-bracket")}
-          onSeeField={() => router.push("/toc-field")}
-          onRemindMe={() => void enable()}
-          alertsOn={enabled && prefs.toc}
-          busy={busy}
-        />
+        {over ? null : (
+          <TocMadness
+            onStart={() => router.push("/toc-bracket")}
+            onSeeField={() => router.push("/toc-field")}
+            onRemindMe={() => void enable()}
+            alertsOn={enabled && prefs.toc}
+            busy={busy}
+          />
+        )}
 
         <View style={styles.group}>
+          {/* Once the brackets are the record rather than the wait, they lead. */}
+          {over ? (
+            <Row
+              icon="trophy"
+              title={bracketsLabel(phase)}
+              detail="Every weight, bout by bout, as it was wrestled"
+              onPress={() => router.push("/toc-results")}
+            />
+          ) : null}
           <Row
             icon="people"
             title="The Field"
-            detail={fieldDetail}
+            detail={over ? "Who was invited, weight by weight" : fieldDetail}
             onPress={() => router.push("/toc-field")}
           />
-          <Row
-            icon="git-branch"
-            title={bracketsLabel(live)}
-            detail={live ? "Results as they happen, weight by weight" : "Every weight's draw and results as they happen"}
-            live={live}
-            onPress={() => router.push("/toc-results")}
-          />
+          {over ? null : (
+            <Row
+              icon="git-branch"
+              title={bracketsLabel(phase)}
+              detail={live ? "Results as they happen, weight by weight" : "Every weight's draw and results as they happen"}
+              live={live}
+              onPress={() => router.push("/toc-results")}
+            />
+          )}
           <Row
             icon="create"
             title="TOC Madness"
-            detail="Your picks, marked right or wrong as bouts finish"
+            detail={over ? "How your picks finished" : "Your picks, marked right or wrong as bouts finish"}
             onPress={() => router.push("/toc-bracket")}
           />
           <Row
             icon="podium"
             title="Leaderboard"
-            detail="How every entry is scoring"
+            detail={over ? "Final standings, top to bottom" : "How every entry is scoring"}
             onPress={() => router.push("/toc-leaderboard")}
           />
           {/* With the results rows: someone checking brackets is the person who wants to watch. */}
           <Row
             icon="play-circle"
             image={require("../../../assets/images/flo-logo.png")}
-            title="Watch live on FloWrestling"
-            detail="Every match, with commentary from Ryan Mitchell of The NC Mat"
+            title={over ? "Watch on FloWrestling" : "Watch live on FloWrestling"}
+            detail={
+              over
+                ? "Every match from the weekend, on demand"
+                : "Every match, with commentary from Ryan Mitchell of The NC Mat"
+            }
             onPress={() => openWeb(TOC_FLO)}
           />
         </View>
 
         <Text style={styles.groupLabel}>THE EVENT</Text>
         <View style={styles.group}>
-          <Row
-            icon="ticket"
-            title="Buy tickets"
-            detail="Seating is limited — families first"
-            accent
-            onPress={() => openWeb(TOC_TICKETS)}
-          />
+          {over ? (
+            <Row
+              icon="medal"
+              title="The awards"
+              detail="Match of Champions, Most Outstanding Wrestler and the Caden Perry scholarship"
+              onPress={() => openWeb(`${TOC_WEB}/results`)}
+            />
+          ) : (
+            <Row
+              icon="ticket"
+              title="Buy tickets"
+              detail="Seating is limited — families first"
+              accent
+              onPress={() => openWeb(TOC_TICKETS)}
+            />
+          )}
           {/*
             Beside tickets, where people are already thinking about the event — and not on the bracket
             screen or in any alert. "Limited run" rather than a count: the store tracks in-stock as a
@@ -183,8 +212,8 @@ export default function TocHubScreen() {
           />
           <Row
             icon="information-circle"
-            title="Schedule, venue and FAQ"
-            detail="Weigh-ins, timing and what to expect"
+            title={over ? "The tournament page" : "Schedule, venue and FAQ"}
+            detail={over ? "The venue, the field and how the weekend ran" : "Weigh-ins, timing and what to expect"}
             onPress={() => openWeb(TOC_WEB)}
           />
         </View>
@@ -195,7 +224,9 @@ export default function TocHubScreen() {
             <View style={styles.toggleRow}>
               <View style={styles.flex}>
                 <Text style={styles.rowTitle}>Fields and brackets</Text>
-                <Text style={styles.rowDetail}>When a weight goes live, and when brackets drop</Text>
+                <Text style={styles.rowDetail}>
+                  {over ? "When next year's field is announced, weight by weight" : "When a weight goes live, and when brackets drop"}
+                </Text>
               </View>
               <Switch
                 value={prefs.toc}
@@ -208,7 +239,7 @@ export default function TocHubScreen() {
             <Pressable style={styles.enable} onPress={() => void enable()} disabled={busy}>
               <Ionicons name="notifications" size={16} color={colors.ink} />
               <Text style={styles.enableText}>
-                {busy ? "Turning on…" : "Know the moment the brackets drop"}
+                {busy ? "Turning on…" : over ? "Know when the 2027 field lands" : "Know the moment the brackets drop"}
               </Text>
             </Pressable>
           )}

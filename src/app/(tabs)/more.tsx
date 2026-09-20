@@ -8,7 +8,7 @@ import { colors, radius, space, type } from "@/theme/tokens"
 import { router } from "expo-router"
 import { DEFAULT_PREFS, PushUnavailableError, registerForPush, syncDevice, withAlertDefaults, type AlertPrefs } from "@/lib/push"
 import { deleteAccount, signOut, useSession } from "@/lib/auth"
-import { bracketsAreLive, bracketsLabel } from "@/lib/toc-live"
+import { bracketsLabel, tocIsOver, tocPhase } from "@/lib/toc-live"
 
 const PREFS_KEY = "recruitnc.alertPrefs"
 const WEB = process.env.EXPO_PUBLIC_WEB_BASE_URL
@@ -20,7 +20,7 @@ const ALERTS: { key: keyof AlertPrefs; title: string; detail: string }[] = [
   {
     key: "toc",
     title: "Tournament of Champions",
-    detail: "The moment a weight class field is released",
+    detail: "Fields, brackets and results — starting with next year's announcements",
   },
   { key: "events", title: "Calendar reminders", detail: "The day before practices and events" },
   {
@@ -159,8 +159,12 @@ export default function MoreScreen() {
           <View style={styles.rowDivider} />
           <Pressable style={styles.row} onPress={() => router.push("/toc-results")}>
             <View style={styles.rowBody}>
-              <Text style={styles.rowTitle}>{bracketsLabel(bracketsAreLive())}</Text>
-              <Text style={styles.rowDetail}>Every weight&apos;s draw and results as they happen</Text>
+              <Text style={styles.rowTitle}>{bracketsLabel(tocPhase())}</Text>
+              <Text style={styles.rowDetail}>
+                {tocIsOver()
+                  ? "Every weight, bout by bout, as it was wrestled"
+                  : "Every weight's draw and results as they happen"}
+              </Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </Pressable>

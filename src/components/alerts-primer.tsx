@@ -28,8 +28,10 @@ const APPEAR_DELAY_MS = 1200
  * system prompt only on a yes. Someone who taps "Not now" can still turn alerts on from More
  * with the real prompt intact.
  *
- * It leads with the Tournament of Champions because that is the reason to say yes right now:
- * weight classes are being released one at a time between now and September.
+ * It used to lead with the Tournament of Champions, because weight classes were being released one
+ * at a time between then and September. That was the best reason to say yes for exactly one month a
+ * year, and the worst thing a new install could read on every other day. So it leads with what is
+ * true all year: commitments, rankings and the tournaments as they come.
  */
 export function AlertsPrimer() {
   const [visible, setVisible] = useState(false)
@@ -126,9 +128,9 @@ export function AlertsPrimer() {
 
           <Text style={styles.title}>Know first</Text>
           <Text style={styles.body}>
-            Tournament of Champions weight classes are being released one at a time. Turn on
-            alerts and we&apos;ll tell you the moment a field goes live — plus new North Carolina
-            commitments as they happen.
+            Turn on alerts and we&apos;ll tell you when a North Carolina wrestler commits, when new
+            rankings are published, and when the fields and brackets for the next Tournament of
+            Champions land.
           </Text>
 
           {problem ? <Text style={styles.problem}>{problem}</Text> : null}

@@ -2,6 +2,7 @@ import { Image, Pressable, StyleSheet, Text, View } from "react-native"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors, radius, space, type } from "@/theme/tokens"
 import { countdownLine, daysUntil, SEEDS_ANNOUNCED } from "@/lib/toc-countdown"
+import { tocIsOver } from "@/lib/toc-live"
 
 /**
  * The tournament, as the top card on Home.
@@ -12,6 +13,11 @@ import { countdownLine, daysUntil, SEEDS_ANNOUNCED } from "@/lib/toc-countdown"
  * Before the brackets drop the button goes to the field, not the bracket. It used to invite people
  * to seed a bracket themselves; that is gone, and a gold button leading to a panel that says come
  * back Friday is worse than no button.
+ *
+ * Afterwards it is a different card with the same frame: the pitch, the countdown, the tickets and
+ * the tee all become false the morning after, and a gold button reading "Fill out your bracket"
+ * leads to a pool that locked on Friday. So the finished card sells the one thing that is still
+ * true and still wanted — the brackets, bout by bout, and who won the pool.
  */
 export function TocMadnessCard({
   announced,
@@ -19,13 +25,18 @@ export function TocMadnessCard({
   onOpenToc,
   onStartBracket,
   onSeeField,
+  onSeeResults,
+  onSeeLeaderboard,
 }: {
   announced: number
   total: number
   onOpenToc: () => void
   onStartBracket: () => void
   onSeeField: () => void
+  onSeeResults: () => void
+  onSeeLeaderboard: () => void
 }) {
+  const over = tocIsOver()
   const seedsOut = daysUntil(SEEDS_ANNOUNCED) <= 0
 
   return (
@@ -37,57 +48,74 @@ export function TocMadnessCard({
           resizeMode="contain"
         />
         <View style={styles.flex}>
-          <Text style={styles.eyebrow}>SEPTEMBER 18–19 · APEX</Text>
-          <Text style={styles.headline}>TOC Madness</Text>
+          <Text style={styles.eyebrow}>{over ? "SEPTEMBER 18–19, 2026 · APEX" : "SEPTEMBER 18–19 · APEX"}</Text>
+          <Text style={styles.headline}>{over ? "Tournament of Champions" : "TOC Madness"}</Text>
         </View>
         <Ionicons name="chevron-forward" size={18} color={colors.gold} />
       </Pressable>
 
       <Text style={styles.lede}>
-        Seeded by The NC Mat, released in the app first. {countdownLine(daysUntil(SEEDS_ANNOUNCED))}
+        {over
+          ? "Ten weights, two days in Apex. Every bracket and every bout, as they were wrestled."
+          : `Seeded by The NC Mat, released in the app first. ${countdownLine(daysUntil(SEEDS_ANNOUNCED))}`}
       </Text>
 
-      <Pressable style={styles.cta} onPress={seedsOut ? onStartBracket : onSeeField}>
-        <Ionicons name={seedsOut ? "git-branch" : "people"} size={16} color={colors.ink} />
-        <Text style={styles.ctaText}>{seedsOut ? "Fill out your bracket" : "See who's in"}</Text>
-      </Pressable>
+      {over ? (
+        <>
+          <Pressable style={styles.cta} onPress={onSeeResults}>
+            <Ionicons name="trophy" size={16} color={colors.ink} />
+            <Text style={styles.ctaText}>See every bracket</Text>
+          </Pressable>
+          <Pressable onPress={onSeeLeaderboard} hitSlop={6}>
+            <Text style={styles.tickets}>Who won TOC Madness</Text>
+          </Pressable>
+        </>
+      ) : (
+        <>
+          <Pressable style={styles.cta} onPress={seedsOut ? onStartBracket : onSeeField}>
+            <Ionicons name={seedsOut ? "git-branch" : "people"} size={16} color={colors.ink} />
+            <Text style={styles.ctaText}>{seedsOut ? "Fill out your bracket" : "See who's in"}</Text>
+          </Pressable>
 
-      <Pressable
-        onPress={() =>
-          void import("expo-web-browser").then((wb) =>
-            wb.openBrowserAsync("https://gofan.co/event/6745154?schoolId=NC101846", {
-              presentationStyle: wb.WebBrowserPresentationStyle.PAGE_SHEET,
-              toolbarColor: colors.ink,
-              controlsColor: colors.gold,
-              dismissButtonStyle: "done",
-            }),
-          )
-        }
-        hitSlop={6}
-      >
-        <Text style={styles.tickets}>Buy tickets for 18–19 September</Text>
-      </Pressable>
+          <Pressable
+            onPress={() =>
+              void import("expo-web-browser").then((wb) =>
+                wb.openBrowserAsync("https://gofan.co/event/6745154?schoolId=NC101846", {
+                  presentationStyle: wb.WebBrowserPresentationStyle.PAGE_SHEET,
+                  toolbarColor: colors.ink,
+                  controlsColor: colors.gold,
+                  dismissButtonStyle: "done",
+                }),
+              )
+            }
+            hitSlop={6}
+          >
+            <Text style={styles.tickets}>Buy tickets for 18–19 September</Text>
+          </Pressable>
 
-      <Pressable
-        onPress={() =>
-          void import("expo-web-browser").then((wb) =>
-            wb.openBrowserAsync(
-              `${process.env.EXPO_PUBLIC_WEB_BASE_URL}/store-app/product/2bcef953-6ce0-47e3-89e4-8b36c1c39f3a`,
-              {
-                presentationStyle: wb.WebBrowserPresentationStyle.PAGE_SHEET,
-                toolbarColor: colors.ink,
-                controlsColor: colors.gold,
-                dismissButtonStyle: "done",
-              },
-            ),
-          )
-        }
-        hitSlop={6}
-      >
-        <Text style={styles.tee}>Get the official tee</Text>
-      </Pressable>
+          <Pressable
+            onPress={() =>
+              void import("expo-web-browser").then((wb) =>
+                wb.openBrowserAsync(
+                  `${process.env.EXPO_PUBLIC_WEB_BASE_URL}/store-app/product/2bcef953-6ce0-47e3-89e4-8b36c1c39f3a`,
+                  {
+                    presentationStyle: wb.WebBrowserPresentationStyle.PAGE_SHEET,
+                    toolbarColor: colors.ink,
+                    controlsColor: colors.gold,
+                    dismissButtonStyle: "done",
+                  },
+                ),
+              )
+            }
+            hitSlop={6}
+          >
+            <Text style={styles.tee}>Get the official tee</Text>
+          </Pressable>
+        </>
+      )}
 
-      {total > 0 ? (
+      {/* The field line counts down to a full field, which is only news while weights are landing. */}
+      {!over && total > 0 ? (
         <Pressable onPress={onOpenToc} hitSlop={6}>
           <Text style={styles.fine}>
             {announced === total

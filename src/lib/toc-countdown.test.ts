@@ -21,14 +21,20 @@ describe("daysUntil", () => {
 })
 
 describe("countdownLine", () => {
+  // `over` is passed explicitly throughout: it defaults to the real clock, which is past the 2026
+  // tournament, so every countdown branch below is only reachable before the next one.
   it("switches from plural to tomorrow to today", () => {
-    expect(countdownLine(17)).toBe("17 days until the brackets drop.")
+    expect(countdownLine(17, false)).toBe("17 days until the brackets drop.")
     // The time is named from one day out: "tomorrow" without it sends people looking at breakfast.
-    expect(countdownLine(1)).toBe("The brackets drop tomorrow at 5:00 PM.")
-    expect(countdownLine(0)).toBe("The brackets drop today at 5:00 PM.")
+    expect(countdownLine(1, false)).toBe("The brackets drop tomorrow at 5:00 PM.")
+    expect(countdownLine(0, false)).toBe("The brackets drop today at 5:00 PM.")
   })
 
   it("stops counting down once the brackets are out", () => {
-    expect(countdownLine(-3)).toContain("make your picks")
+    expect(countdownLine(-3, false)).toContain("make your picks")
+  })
+
+  it("stops selling the pool once the tournament is over", () => {
+    expect(countdownLine(-9, true)).toBe("Final results are in — every bracket, bout by bout.")
   })
 })
