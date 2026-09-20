@@ -58,6 +58,7 @@ function BracketCard({
   winners,
   resolved,
   verdicts,
+  outcomes,
   onPickWinner,
   scroll = true,
   cardRef,
@@ -71,6 +72,8 @@ function BracketCard({
   resolved: Record<number, { top: BracketSlotDisplay; bottom: BracketSlotDisplay }>
   /** How each pick has held up, once results start landing. Absent before the first bout. */
   verdicts?: Record<number, PickVerdict>
+  /** How each bout was actually won, once results are in. */
+  outcomes?: BracketResults["outcomes"]
   onPickWinner: (boutNumber: number, competitorId: string) => void
   scroll?: boolean
   cardRef?: Ref<View>
@@ -106,6 +109,7 @@ function BracketCard({
           winners={winners}
           resolved={resolved}
           verdicts={verdicts}
+          outcomes={outcomes}
           onPickWinner={onPickWinner}
           scroll={scroll}
         />
@@ -120,6 +124,7 @@ function BracketCard({
               winners={winners}
               resolved={resolved}
               verdicts={verdicts}
+              outcomes={outcomes}
               onPickWinner={onPickWinner}
               scroll={scroll}
             />
@@ -637,6 +642,7 @@ export default function TocBracketScreen() {
                     winners={winnersByBout}
                     resolved={resolvedByBout}
                     verdicts={verdicts}
+                    outcomes={results?.outcomes}
                     onPickWinner={tapSlot}
                   />
 
@@ -654,6 +660,7 @@ export default function TocBracketScreen() {
                       winners={winnersByBout}
                       resolved={resolvedByBout}
                       verdicts={verdicts}
+                      outcomes={results?.outcomes}
                       onPickWinner={tapSlot}
                     />
                   </View>

@@ -277,6 +277,7 @@ export default function TocResultsScreen() {
               layout={preview.layout.championship}
               winners={winnersByBout}
               resolved={resolvedByBout}
+              outcomes={results?.outcomes}
               onPickWinner={() => undefined}
             />
 
@@ -287,6 +288,7 @@ export default function TocResultsScreen() {
                   layout={preview.layout.consolation}
                   winners={winnersByBout}
                   resolved={resolvedByBout}
+                  outcomes={results?.outcomes}
                   onPickWinner={() => undefined}
                 />
               </>

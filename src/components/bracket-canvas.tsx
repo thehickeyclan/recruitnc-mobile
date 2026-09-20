@@ -36,6 +36,14 @@ type Props = {
    * there is nothing to be right or wrong about, so its winners stay gold.
    */
   verdicts?: Record<number, "correct" | "wrong" | "dead" | "pending">
+  /**
+   * Bout number → how it was won: "TF 17-2", "MD 13-4".
+   *
+   * The bracket showed who survived and never how. A parent reading it could not tell a pin from
+   * a one-point decision without opening the results list, which is the first thing anyone asks
+   * about their own kid's match.
+   */
+  outcomes?: Record<number, { method: string | null; winnerScore: number | null; loserScore: number | null }>
   onPickWinner: (boutNumber: number, competitorId: string) => void
   /**
    * False lays the canvas out at its full natural width with no ScrollView around it.
@@ -110,12 +118,23 @@ function Slot({
   )
 }
 
+/** Wrestling's own shorthand, which is what the scoring table and every coach already uses. */
+const METHOD_LABEL: Record<string, string> = { FALL: "F", TF: "TF", MAJ: "MD", DEC: "DEC" }
+
+function outcomeLabel(outcome: Props["outcomes"] extends Record<number, infer O> | undefined ? O | undefined : never): string | null {
+  if (!outcome) return null
+  const method = outcome.method ? (METHOD_LABEL[outcome.method] ?? outcome.method) : null
+  const score = outcome.winnerScore != null && outcome.loserScore != null ? `${outcome.winnerScore}-${outcome.loserScore}` : null
+  return [method, score].filter(Boolean).join(" ") || null
+}
+
 function MatchCard({
   match,
   layout,
   winnerId,
   verdict,
   resolved,
+  outcome,
   onPickWinner,
 }: {
   match: BracketLayoutMatch
@@ -123,6 +142,7 @@ function MatchCard({
   winnerId: string | null
   verdict?: "correct" | "wrong" | "dead" | "pending"
   resolved?: { top: BracketSlotDisplay; bottom: BracketSlotDisplay }
+  outcome?: { method: string | null; winnerScore: number | null; loserScore: number | null }
   onPickWinner: Props["onPickWinner"]
 }) {
   const bout = match.boutNumber
@@ -140,6 +160,11 @@ function MatchCard({
       {layout.boutHeaderHeight > 0 && bout != null ? (
         <View style={[styles.boutHeader, { height: layout.boutHeaderHeight }]}>
           <Text style={styles.boutHeaderText}>BOUT {bout}</Text>
+          {outcomeLabel(outcome) ? (
+            <Text style={styles.boutResultText} numberOfLines={1}>
+              {outcomeLabel(outcome)}
+            </Text>
+          ) : null}
         </View>
       ) : null}
       <Slot
@@ -162,7 +187,7 @@ function MatchCard({
   )
 }
 
-export function BracketCanvas({ layout, winners, resolved, verdicts, onPickWinner, scroll = true }: Props) {
+export function BracketCanvas({ layout, winners, resolved, verdicts, outcomes, onPickWinner, scroll = true }: Props) {
   // Room for the round labels above the first card.
   const labelBand = 26
 
@@ -192,6 +217,7 @@ export function BracketCanvas({ layout, winners, resolved, verdicts, onPickWinne
                 winnerId={m.boutNumber != null ? (winners[m.boutNumber] ?? null) : null}
                 verdict={m.boutNumber != null ? verdicts?.[m.boutNumber] : undefined}
                 resolved={m.boutNumber != null ? resolved?.[m.boutNumber] : undefined}
+                outcome={m.boutNumber != null ? outcomes?.[m.boutNumber] : undefined}
                 onPickWinner={onPickWinner}
               />
             ))}
@@ -234,13 +260,16 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   boutHeader: {
-    justifyContent: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: space.sm,
     backgroundColor: colors.raised,
     borderBottomWidth: 1,
     borderBottomColor: colors.line,
   },
   boutHeaderText: { ...type.caption, color: colors.textMuted, fontSize: 9 },
+  boutResultText: { ...type.caption, color: colors.gold, fontSize: 9, fontWeight: "700" },
 
   slot: { flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: space.sm },
   slotDivider: { borderBottomWidth: 1, borderBottomColor: colors.line },
