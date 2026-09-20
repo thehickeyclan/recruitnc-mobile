@@ -278,14 +278,21 @@ export default function TocResultsScreen() {
 
         {preview && results && !notReleased ? (
           <>
-            <View style={styles.statusRow}>
-              <View>
-                <Text style={styles.statusStrong}>
-                  {results.recorded} of {results.totalBouts} bouts recorded
-                </Text>
-                <Text style={styles.statusSub}>{freshness(results.lastUpdated)}</Text>
+            {/*
+              Progress belongs to a tournament still running. Once a weight has a champion, "12 of
+              12 bouts recorded · updated 29 minutes ago" is just clutter above the result — and on
+              133, where two byes are never recorded, the count would have read 10 of 12 forever.
+            */}
+            {placers.first ? null : (
+              <View style={styles.statusRow}>
+                <View>
+                  <Text style={styles.statusStrong}>
+                    {results.recorded} of {results.totalBouts} bouts recorded
+                  </Text>
+                  <Text style={styles.statusSub}>{freshness(results.lastUpdated)}</Text>
+                </View>
               </View>
-            </View>
+            )}
 
             {placers.first || placers.second || placers.third ? (
               <View style={styles.podium}>
