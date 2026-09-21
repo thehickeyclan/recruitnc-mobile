@@ -13,8 +13,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { Image } from "expo-image"
+import { router } from "expo-router"
 import { colors, radius, space, type } from "@/theme/tokens"
-import { openAthleteProfile } from "@/lib/profile-link"
 import { fetchCommits, type Commit } from "@/lib/commits"
 import { FilterChips, type Chip } from "@/components/filter-chips"
 
@@ -54,7 +54,7 @@ function CommitCard({ commit }: { commit: Commit }) {
   return (
     <Pressable
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-      onPress={() => openAthleteProfile(commit.id)}
+      onPress={() => router.push({ pathname: "/athlete/[id]", params: { id: commit.id, name: commit.name } })}
       accessibilityRole="link"
       accessibilityLabel={`${commit.name} profile`}
     >

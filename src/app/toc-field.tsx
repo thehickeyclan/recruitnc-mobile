@@ -14,7 +14,6 @@ import { SafeAreaView } from "react-native-safe-area-context"
 import { router, useLocalSearchParams } from "expo-router"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors, radius, space, type } from "@/theme/tokens"
-import { openAthleteProfile } from "@/lib/profile-link"
 import { daysUntil, SEEDS_ANNOUNCED } from "@/lib/toc-countdown"
 import { tocIsOver } from "@/lib/toc-live"
 import {
@@ -34,7 +33,9 @@ function AthleteCard({ athlete }: { athlete: TocFieldAthlete }) {
   return (
     <Pressable
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-      onPress={() => openAthleteProfile(athlete.athleteId)}
+      onPress={() =>
+        router.push({ pathname: "/athlete/[id]", params: { id: athlete.athleteId, name: athlete.name } })
+      }
       accessibilityRole="link"
       accessibilityLabel={`${athlete.name} profile`}
     >

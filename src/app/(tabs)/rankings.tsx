@@ -15,7 +15,6 @@ import { router } from "expo-router"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors, radius, space, type } from "@/theme/tokens"
 import { useSession } from "@/lib/auth"
-import { openAthleteProfile } from "@/lib/profile-link"
 import {
   fetchRankingClasses,
   fetchRankings,
@@ -113,7 +112,9 @@ function RankRow({ prospect }: { prospect: RankedProspect }) {
   return (
     <Pressable
       style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-      onPress={() => openAthleteProfile(prospect.athleteId)}
+      onPress={() =>
+        router.push({ pathname: "/athlete/[id]", params: { id: prospect.athleteId!, name: prospect.name } })
+      }
       accessibilityRole="link"
       accessibilityLabel={`${prospect.name} profile`}
     >
