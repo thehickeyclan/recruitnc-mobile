@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from "react"
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native"
+import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { Image } from "expo-image"
 import { router, useLocalSearchParams } from "expo-router"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors, radius, space, type } from "@/theme/tokens"
 import { openAthleteProfile } from "@/lib/profile-link"
+import { claimAthleteProfile, currentUserId, loadAthleteEdits } from "@/lib/athlete-edit"
 import {
   fetchAthleteProfile,
   profileMetaLine,
@@ -91,6 +92,44 @@ export default function AthleteProfileScreen() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /*
+   * Whether this person may edit, answered by the server rather than guessed here.
+   *
+   * "mine" when the profile is theirs or their child's, "signed-out" when nobody is, and
+   * "other" for anyone looking at somebody else's wrestler — which is most people, most of the
+   * time, and is not an error.
+   */
+  const [standing, setStanding] = useState<"unknown" | "mine" | "other" | "signed-out">("unknown")
+  const [claiming, setClaiming] = useState(false)
+
+  const checkStanding = useCallback(async () => {
+    try {
+      if (!(await currentUserId())) return setStanding("signed-out")
+      setStanding((await loadAthleteEdits(String(id))) ? "mine" : "other")
+    } catch {
+      setStanding("other")
+    }
+  }, [id])
+
+  useEffect(() => {
+    void checkStanding()
+  }, [checkStanding])
+
+  const claim = (as: "self" | "parent") => {
+    setClaiming(true)
+    void claimAthleteProfile(String(id), as)
+      .then(async () => {
+        await checkStanding()
+        Alert.alert(
+          as === "self" ? "Profile claimed" : "Athlete linked",
+          as === "self"
+            ? "It is yours now — add your GPA, film and projected college weight."
+            : "You can edit this profile from here.",
+        )
+      })
+      .catch((e: unknown) => Alert.alert("Could not claim", e instanceof Error ? e.message : "Try again."))
+      .finally(() => setClaiming(false))
+  }
 
   const load = useCallback(async () => {
     setError(null)
@@ -164,6 +203,41 @@ export default function AthleteProfileScreen() {
               ) : null}
             </View>
           </View>
+
+          {standing === "mine" ? (
+            <Pressable
+              style={styles.ownerAction}
+              onPress={() =>
+                router.push({ pathname: "/athlete-edit", params: { id: String(id), name: athlete.name } })
+              }
+            >
+              <Ionicons name="create" size={16} color={colors.ink} />
+              <Text style={styles.ownerActionText}>Edit profile</Text>
+            </Pressable>
+          ) : standing === "other" || standing === "signed-out" ? (
+            <View style={styles.claimCard}>
+              <Text style={styles.claimTitle}>Is this you?</Text>
+              <Text style={styles.claimBody}>
+                {standing === "signed-out"
+                  ? "Sign in to claim this profile and add your GPA, film and projected college weight."
+                  : "Claim it to add your GPA, film and projected college weight — the things college coaches look for first."}
+              </Text>
+              {standing === "signed-out" ? (
+                <Pressable style={styles.claimButton} onPress={() => router.push("/sign-in")}>
+                  <Text style={styles.claimButtonText}>Sign in</Text>
+                </Pressable>
+              ) : (
+                <View style={styles.claimRow}>
+                  <Pressable style={styles.claimButton} disabled={claiming} onPress={() => claim("self")}>
+                    <Text style={styles.claimButtonText}>{claiming ? "…" : "This is me"}</Text>
+                  </Pressable>
+                  <Pressable style={styles.claimSecondary} disabled={claiming} onPress={() => claim("parent")}>
+                    <Text style={styles.claimSecondaryText}>I'm a parent</Text>
+                  </Pressable>
+                </View>
+              )}
+            </View>
+          ) : null}
 
           {weight.headline ? (
             <View style={styles.weightBar}>
@@ -274,6 +348,46 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   rankText: { ...type.caption, color: colors.ink },
+
+  ownerAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: space.sm,
+    backgroundColor: colors.gold,
+    borderRadius: radius.md,
+    paddingVertical: space.md,
+  },
+  ownerActionText: { ...type.label, color: colors.ink, fontWeight: "800" },
+
+  claimCard: {
+    backgroundColor: colors.raised,
+    borderWidth: 1,
+    borderColor: colors.gold,
+    borderRadius: radius.md,
+    padding: space.md,
+    gap: space.sm,
+  },
+  claimTitle: { ...type.heading, color: colors.text },
+  claimBody: { ...type.label, color: colors.textSecondary, fontWeight: "500", lineHeight: 18 },
+  claimRow: { flexDirection: "row", gap: space.sm },
+  claimButton: {
+    flex: 1,
+    backgroundColor: colors.gold,
+    borderRadius: radius.md,
+    paddingVertical: space.sm,
+    alignItems: "center",
+  },
+  claimButtonText: { ...type.label, color: colors.ink, fontWeight: "800" },
+  claimSecondary: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radius.md,
+    paddingVertical: space.sm,
+    alignItems: "center",
+  },
+  claimSecondaryText: { ...type.label, color: colors.textSecondary, fontWeight: "700" },
 
   weightBar: {
     backgroundColor: colors.surface,
