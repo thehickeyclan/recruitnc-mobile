@@ -63,6 +63,7 @@ function CommitCard({ commit }: { commit: Commit }) {
           source={{ uri: commit.photourl! }}
           style={styles.avatar}
           contentFit="cover"
+          contentPosition="top"
           transition={180}
           onError={() => setPhotoFailed(true)}
         />

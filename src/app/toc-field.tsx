@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   ActivityIndicator,
   FlatList,
-  Image,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -11,6 +10,7 @@ import {
   View,
 } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
+import { Image } from "expo-image"
 import { router, useLocalSearchParams } from "expo-router"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors, radius, space, type } from "@/theme/tokens"
@@ -40,7 +40,13 @@ function AthleteCard({ athlete }: { athlete: TocFieldAthlete }) {
       accessibilityLabel={`${athlete.name} profile`}
     >
       {athlete.photoUrl ? (
-        <Image source={{ uri: athlete.photoUrl }} style={styles.photo} />
+        <Image
+          source={{ uri: athlete.photoUrl }}
+          style={styles.photo}
+          contentFit="cover"
+          contentPosition="top"
+          transition={180}
+        />
       ) : (
         <View style={[styles.photo, styles.photoEmpty]}>
           <Ionicons name="person" size={20} color={colors.textMuted} />

@@ -185,7 +185,15 @@ export default function AthleteProfileScreen() {
         >
           <View style={styles.hero}>
             {athlete.photoUrl ? (
-              <Image source={{ uri: athlete.photoUrl }} style={styles.photo} contentFit="cover" transition={180} />
+              <Image
+                source={{ uri: athlete.photoUrl }}
+                style={styles.photo}
+                contentFit="cover"
+                /* A wrestling photo is usually waist-up or full body: centre-cropping a
+                   portrait into a square takes the torso and cuts the head off. */
+                contentPosition="top"
+                transition={180}
+              />
             ) : (
               <View style={[styles.photo, styles.photoEmpty]}>
                 <Text style={styles.initials}>{initials(athlete.name || String(name ?? ""))}</Text>
