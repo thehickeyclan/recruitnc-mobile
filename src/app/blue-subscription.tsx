@@ -8,8 +8,12 @@ import Ionicons from "@expo/vector-icons/Ionicons"
 import {
   cancelBlueBillingMembership,
   createBlueBillingPortal,
-  fetchBlueBillingMemberships,
+  fetchBlueBilling,
+  pauseBlueBillingMembership,
+  resumeBlueBillingMembership,
+  retryBlueBillingPayment,
   type BlueBillingMembership,
+  type BlueWiqSubscription,
 } from "@/lib/blue-billing"
 import { colors, radius, space, type } from "@/theme/tokens"
 
@@ -26,6 +30,7 @@ function statusLabel(membership: BlueBillingMembership): string {
 
 export default function BlueSubscriptionScreen() {
   const [memberships, setMemberships] = useState<BlueBillingMembership[]>([])
+  const [wiqSubscriptions, setWiqSubscriptions] = useState<BlueWiqSubscription[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -35,7 +40,9 @@ export default function BlueSubscriptionScreen() {
     refresh ? setRefreshing(true) : setLoading(true)
     setError(null)
     try {
-      setMemberships(await fetchBlueBillingMemberships())
+      const state = await fetchBlueBilling()
+      setMemberships(state.memberships)
+      setWiqSubscriptions(state.wiqSubscriptions)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not load your Blue subscription.")
     } finally {
@@ -61,6 +68,54 @@ export default function BlueSubscriptionScreen() {
     } finally {
       setBusyId(null)
     }
+  }
+
+  function run(membership: BlueBillingMembership, work: () => Promise<string>, successTitle: string) {
+    setBusyId(membership.id)
+    setError(null)
+    void work()
+      .then((message) => {
+        Alert.alert(successTitle, message)
+        return load(true)
+      })
+      .catch((cause) => setError(cause instanceof Error ? cause.message : "That did not work."))
+      .finally(() => setBusyId(null))
+  }
+
+  /*
+   * Pause, offered before cancel.
+   *
+   * The screen shipped with cancel and nothing else, so a family facing an injury or a thin
+   * month could end their membership from their phone but not hold it. Three months is the
+   * default because that is roughly an injury or an off-season, and a date has to be chosen
+   * for Stripe — the web form asks; here the common case is one tap.
+   */
+  function confirmPause(membership: BlueBillingMembership) {
+    const resumeAt = new Date()
+    resumeAt.setMonth(resumeAt.getMonth() + 3)
+    Alert.alert(
+      "Pause Blue subscription?",
+      `Billing for ${membership.athleteName} stops now and starts again on ${dateLabel(resumeAt.toISOString())}. You can resume any time before then.`,
+      [
+        { text: "Not now", style: "cancel" },
+        {
+          text: "Pause 3 months",
+          onPress: () =>
+            run(membership, () => pauseBlueBillingMembership(membership.id, resumeAt.toISOString()), "Subscription paused"),
+        },
+      ],
+    )
+  }
+
+  function confirmResume(membership: BlueBillingMembership) {
+    Alert.alert(
+      "Resume billing?",
+      `${membership.athleteName}'s membership starts again today.`,
+      [
+        { text: "Not yet", style: "cancel" },
+        { text: "Resume", onPress: () => run(membership, () => resumeBlueBillingMembership(membership.id), "Subscription resumed") },
+      ],
+    )
   }
 
   function confirmCancel(membership: BlueBillingMembership) {
@@ -108,7 +163,54 @@ export default function BlueSubscriptionScreen() {
           <View style={styles.center}><ActivityIndicator color={colors.gold} /><Text style={styles.muted}>Loading billing details…</Text></View>
         ) : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}
-        {!loading && memberships.length === 0 ? (
+        {/*
+          The original Blue cohort bills through WrestlingIQ, not Stripe. Until now those
+          families opened this screen and read "No Stripe subscription found" while paying $51
+          a month — so the card comes first, and the empty state only shows when there is
+          genuinely nothing.
+        */}
+        {wiqSubscriptions.map((sub) => (
+          <View key={sub.id} style={styles.card}>
+            <View style={styles.cardHeader}>
+              <View style={styles.flex}>
+                <Text style={styles.cardTitle}>{sub.athleteName}</Text>
+                <Text style={styles.plan}>
+                  Blue Membership{sub.comped ? " · Scholarship" : sub.amountFormatted ? ` · ${sub.amountFormatted}/month` : ""}
+                </Text>
+              </View>
+              <View style={[styles.badge, sub.status === "active" ? styles.badgeActive : null]}>
+                <Text style={styles.badgeText}>
+                  {sub.comped ? "Scholarship" : sub.status === "active" ? "Active" : "Ends soon"}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.details}>
+              <View style={styles.detailRow}><Text style={styles.detailLabel}>Member since</Text><Text style={styles.detailValue}>{dateLabel(sub.memberSince)}</Text></View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>{sub.status === "active" ? "Next payment" : "Access until"}</Text>
+                <Text style={styles.detailValue}>{dateLabel(sub.status === "active" ? sub.nextDueAt : sub.activeUntil)}</Text>
+              </View>
+              <View style={styles.detailRow}><Text style={styles.detailLabel}>Billed through</Text><Text style={styles.detailValue}>WrestlingIQ</Text></View>
+            </View>
+
+            {/* No Pause or Cancel here: there is no write path to WrestlingIQ, and a button
+                that looked like it worked would be worse than none. */}
+            <Text style={styles.muted}>
+              Your membership is billed through WrestlingIQ, so pausing, cancelling or updating your card happens
+              there rather than in the app.
+            </Text>
+            <Pressable
+              style={styles.secondaryButton}
+              onPress={() => void WebBrowser.openBrowserAsync("https://www.wrestlingiq.com/")}
+            >
+              <Ionicons name="open-outline" size={18} color={colors.gold} />
+              <Text style={styles.secondaryText}>Manage in WrestlingIQ</Text>
+            </Pressable>
+          </View>
+        ))}
+
+        {!loading && memberships.length === 0 && wiqSubscriptions.length === 0 ? (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>No Stripe subscription found</Text>
             <Text style={styles.muted}>Blue billing appears here for the account that pays for the membership.</Text>
@@ -143,6 +245,28 @@ export default function BlueSubscriptionScreen() {
                 <Pressable style={styles.primaryButton} disabled={working} onPress={() => void openPortal(membership)}>
                   {working ? <ActivityIndicator color={colors.ink} /> : <Ionicons name="card-outline" size={18} color={colors.ink} />}
                   <Text style={styles.primaryText}>Update card & view invoices</Text>
+                </Pressable>
+              ) : null}
+              {/* A failed payment is recoverable from the phone now; dunning emails had nowhere
+                  to send a parent but a desktop. */}
+              {membership.status === "pending_payment" ? (
+                <Pressable style={styles.secondaryButton} disabled={working} onPress={() => run(membership, () => retryBlueBillingPayment(membership.id), "Payment retried")}>
+                  <Ionicons name="refresh-outline" size={18} color={colors.gold} />
+                  <Text style={styles.secondaryText}>Retry payment</Text>
+                </Pressable>
+              ) : null}
+              {membership.status === "paused" ? (
+                <Pressable style={styles.secondaryButton} disabled={working} onPress={() => confirmResume(membership)}>
+                  <Ionicons name="play-outline" size={18} color={colors.gold} />
+                  <Text style={styles.secondaryText}>
+                    Resume billing{membership.resumeAt ? ` (auto-resumes ${dateLabel(membership.resumeAt)})` : ""}
+                  </Text>
+                </Pressable>
+              ) : null}
+              {!ended && !membership.cancelAtPeriodEnd && membership.status !== "paused" ? (
+                <Pressable style={styles.secondaryButton} disabled={working} onPress={() => confirmPause(membership)}>
+                  <Ionicons name="pause-outline" size={18} color={colors.gold} />
+                  <Text style={styles.secondaryText}>Pause subscription</Text>
                 </Pressable>
               ) : null}
               {!ended && !membership.cancelAtPeriodEnd ? (
@@ -182,6 +306,17 @@ const styles = StyleSheet.create({
   detailValue: { ...type.label, color: colors.text, textAlign: "right", flex: 1 },
   primaryButton: { minHeight: 48, borderRadius: radius.md, backgroundColor: colors.gold, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: space.sm, paddingHorizontal: space.md },
   primaryText: { ...type.label, color: colors.ink, fontWeight: "800" },
+  secondaryButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: space.sm,
+    paddingVertical: space.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.gold,
+  },
+  secondaryText: { ...type.label, color: colors.gold },
   cancelButton: { alignItems: "center", paddingVertical: space.sm },
   cancelText: { ...type.label, color: colors.red },
   muted: { ...type.body, color: colors.textMuted, textAlign: "center", lineHeight: 21 },
