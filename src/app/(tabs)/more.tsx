@@ -131,6 +131,18 @@ export default function MoreScreen() {
                 <Text style={styles.rowDetail}>{session?.user?.email ?? ""}</Text>
               </View>
             </View>
+            <Pressable
+              style={[styles.row, styles.rowDivider]}
+              onPress={() => void WebBrowser.openBrowserAsync(`${WEB}/rankings`, {
+                presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
+              })}
+            >
+              <View style={styles.rowBody}>
+                <Text style={styles.rowTitle}>Manage rankings subscription</Text>
+                <Text style={styles.rowDetail}>View status, update payment, or cancel on the secure website</Text>
+              </View>
+              <Ionicons name="open-outline" size={16} color={colors.textMuted} />
+            </Pressable>
             <Pressable style={[styles.row, styles.rowDivider]} onPress={() => void signOut()}>
               <Text style={styles.linkTitle}>Sign out</Text>
               <Ionicons name="log-out-outline" size={16} color={colors.textMuted} />
