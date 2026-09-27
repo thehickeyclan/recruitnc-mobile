@@ -1,352 +1,146 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native"
+import { useCallback, useState } from "react"
+import { Pressable, StyleSheet, Text, View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
-import { Image } from "expo-image"
-import { router } from "expo-router"
+import * as WebBrowser from "expo-web-browser"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors, radius, space, type } from "@/theme/tokens"
-import { useSession } from "@/lib/auth"
-import {
-  fetchRankingClasses,
-  fetchRankings,
-  type RankingGender,
-  type RankedProspect,
-  type RankingClass,
-} from "@/lib/rankings"
 
-/** "Matthew Akins" → "MA", for the handful of prospects with no photo on file. */
-function initialsOf(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean)
-  if (parts.length === 0) return "?"
-  return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase()
-}
+/**
+ * Rankings open on the web, for now.
+ *
+ * This tab used to read the `public_rankings` table straight from Supabase with the anon key,
+ * which is bundled into the app. That was fine while the rankings were free; they are not any
+ * more. The web gates them behind NC United Blue membership, coach verification or a RecruitNC
+ * subscription, and a phone reading the table directly walked past all of it — the anon key is
+ * in every copy of the app, so "only the app can read it" was never true either.
+ *
+ * Two other things were wrong with the table and argue against going back to it: nothing syncs
+ * it to what the web publishes, so it was six weeks stale, and it held 83 rows for a class
+ * published as a top 30.
+ *
+ * Handing the browser the real page fixes all of it at once, ships as an over-the-air update
+ * with no review cycle, and means the entitlement logic lives in exactly one place. A proper
+ * in-app board comes later, reading an endpoint that checks the session.
+ */
 
-function RankRow({ prospect }: { prospect: RankedProspect }) {
-  const podium = prospect.rank <= 3
-  // Not every ranking row is linked to a directory profile, and a row without one must not be
-  // a Pressable that does nothing. Two explicit branches rather than a swapped component:
-  // View does not accept a function for `style`, so sharing one element silently broke the
-  // unlinked rows' layout.
-  const body = (
-    <>
-      <View style={[styles.rankBadge, podium && styles.rankBadgePodium]}>
-        <Text style={[styles.rankText, podium && styles.rankTextPodium]}>{prospect.rank}</Text>
-      </View>
-
-      {/* The face is the point. A list of names reads like a spreadsheet; these are kids people
-          recognise from a mat last weekend. */}
-      {prospect.photoUrl ? (
-        <Image
-          source={{ uri: prospect.photoUrl }}
-          style={styles.photo}
-          contentFit="cover"
-          contentPosition="top"
-          transition={180}
-        />
-      ) : (
-        <View style={[styles.photo, styles.photoEmpty]}>
-          <Text style={styles.initials}>{initialsOf(prospect.name)}</Text>
-        </View>
-      )}
-
-      <View style={styles.rowBody}>
-        <Text style={styles.name} numberOfLines={1}>
-          {prospect.name}
-        </Text>
-        {prospect.highSchool ? (
-          <View style={styles.schoolLine}>
-            {prospect.highSchoolLogoUrl ? (
-              <Image
-                source={{ uri: prospect.highSchoolLogoUrl }}
-                style={styles.schoolLogo}
-                resizeMode="contain"
-              />
-            ) : null}
-            <Text style={styles.school} numberOfLines={1}>
-              {prospect.highSchool}
-            </Text>
-          </View>
-        ) : null}
-        {prospect.allAmerican || prospect.stateResult || prospect.gpa || prospect.rankedWin ? (
-          <View style={styles.badges}>
-            {/* All-American first: it is the strongest thing on the row, and it is national. */}
-            {prospect.allAmerican ? (
-              // The server's own wording — "2x All-American", "2025 NHSCA All-American" — so a
-              // wrestler reads the same on the phone as on his ranking card.
-              <View style={[styles.badge, styles.badgeAA]}>
-                <Text style={[styles.badgeText, styles.badgeTextAA]}>
-                  {prospect.allAmerican.toUpperCase()}
-                </Text>
-              </View>
-            ) : null}
-            {prospect.stateResult ? (
-              <View style={[styles.badge, styles.badgeGold]}>
-                <Text style={[styles.badgeText, styles.badgeTextGold]}>{prospect.stateResult}</Text>
-              </View>
-            ) : null}
-            {prospect.rankedWin ? (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>RANKED WIN</Text>
-              </View>
-            ) : null}
-            {prospect.gpa ? (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{prospect.gpa.toFixed(1)} GPA</Text>
-              </View>
-            ) : null}
-          </View>
-        ) : null}
-      </View>
-
-      {prospect.athleteId ? (
-        <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-      ) : null}
-    </>
-  )
-
-  if (!prospect.athleteId) return <View style={styles.row}>{body}</View>
-
-  return (
-    <Pressable
-      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-      onPress={() =>
-        router.push({ pathname: "/athlete/[id]", params: { id: prospect.athleteId!, name: prospect.name } })
-      }
-      accessibilityRole="link"
-      accessibilityLabel={`${prospect.name} profile`}
-    >
-      {body}
-    </Pressable>
-  )
-}
+const WEB_BASE = process.env.EXPO_PUBLIC_WEB_BASE_URL ?? "https://app.ncwrestlingunited.com"
+const RANKINGS_URL = `${WEB_BASE}/rankings`
 
 export default function RankingsScreen() {
-  const { signedIn, loading: sessionLoading } = useSession()
-  const [classes, setClasses] = useState<RankingClass[]>([])
-  const [activeYear, setActiveYear] = useState<number | null>(null)
-  /** Fixed: RecruitNC publishes boys' rankings only. */
-  const gender: RankingGender = "male"
-  const [prospects, setProspects] = useState<RankedProspect[]>([])
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [opening, setOpening] = useState(false)
 
-  useEffect(() => {
-    let cancelled = false
-    fetchRankingClasses()
-      .then((found) => {
-        if (cancelled) return
-        setClasses(found)
-        // The nearest class first — 2027 is the one being recruited now, and the one people
-        // open this tab to check. Publication order put whichever class was edited last on
-        // top, which is an editing detail, not what a reader wants.
-        setActiveYear(found.find((c) => c.gender === "male")?.graduationYear ?? found[0]?.graduationYear ?? null)
-      })
-      .catch((e) => !cancelled && setError(e instanceof Error ? e.message : "Could not load rankings"))
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  const load = useCallback(async (year: number, forGender: RankingGender) => {
+  const open = useCallback(async () => {
+    setOpening(true)
     try {
-      setError(null)
-      setProspects(await fetchRankings(year, forGender))
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not load rankings")
+      // In-app browser rather than Safari: the session cookie a Blue member already has on the
+      // web comes with them, so they land on the rankings instead of a sign-in wall.
+      await WebBrowser.openBrowserAsync(RANKINGS_URL, {
+        toolbarColor: colors.ink,
+        controlsColor: colors.gold,
+      })
+    } catch {
+      // Nothing to recover: the button simply becomes pressable again.
+    } finally {
+      setOpening(false)
     }
   }, [])
-
-  /**
-   * Only the boys' classes are published, and there is no plan to publish girls'.
-   * The filter stays so a stray female row could never appear in this list unannounced.
-   */
-  const shownClasses = useMemo(() => classes.filter((c) => c.gender === gender), [classes, gender])
-
-  useEffect(() => {
-    if (activeYear == null) return
-    setLoading(true)
-    void load(activeYear, gender).finally(() => setLoading(false))
-  }, [activeYear, gender, load])
-
-  const onRefresh = useCallback(async () => {
-    if (activeYear == null) return
-    setRefreshing(true)
-    await load(activeYear, gender)
-    setRefreshing(false)
-  }, [activeYear, load])
-
-  if (!sessionLoading && !signedIn) {
-    return (
-      <SafeAreaView style={styles.screen} edges={["top"]}>
-        <View style={styles.header}>
-          <Text style={styles.eyebrow}>RECRUITNC</Text>
-          <Text style={styles.title} maxFontSizeMultiplier={1.4}>Rankings</Text>
-        </View>
-        <View style={styles.gate}>
-          <Ionicons name="lock-closed" size={34} color={colors.line} />
-          <Text style={styles.gateTitle}>Sign in for RecruitNC rankings</Text>
-          <Text style={styles.gateBody}>
-            Rankings are an account feature so we can protect the work and personalize your view.
-            Commitments, the calendar and Data Dawg stay open to everyone.
-          </Text>
-          <Pressable
-            style={styles.gateButton}
-            onPress={() =>
-              router.push({
-                pathname: "/sign-in",
-                params: { reason: "Sign in to see RecruitNC prospect rankings." },
-              })
-            }
-          >
-            <Text style={styles.gateButtonText}>Sign in or create an account</Text>
-          </Pressable>
-        </View>
-      </SafeAreaView>
-    )
-  }
 
   return (
-    <SafeAreaView style={styles.screen} edges={["top"]}>
-      <View style={styles.header}>
-        <Text style={styles.eyebrow}>RECRUITNC</Text>
-        <Text style={styles.title} maxFontSizeMultiplier={1.4}>Rankings</Text>
+    <SafeAreaView style={styles.safe} edges={["top"]}>
+      <View style={styles.body}>
+        <View style={styles.badge}>
+          <Ionicons name="trophy-outline" size={28} color={colors.gold} />
+        </View>
+
+        <Text style={styles.title}>RecruitNC Rankings</Text>
+        <Text style={styles.lede}>
+          North Carolina&apos;s top 30 in every class, ranked on results.
+        </Text>
+
+        <View style={styles.card}>
+          {[
+            "Every match scored, weighted to this season",
+            "NHSCA, Super 32, Fargo and Journeymen",
+            "Head-to-head settles a tie",
+            "Every win graded by who it was over",
+          ].map((line) => (
+            <View key={line} style={styles.row}>
+              <Ionicons name="checkmark" size={16} color={colors.gold} style={styles.check} />
+              <Text style={styles.rowText}>{line}</Text>
+            </View>
+          ))}
+        </View>
+
+        <Pressable
+          onPress={open}
+          disabled={opening}
+          style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed, opening && styles.ctaDisabled]}
+        >
+          <Text style={styles.ctaText}>{opening ? "Opening…" : "Open rankings"}</Text>
+          <Ionicons name="open-outline" size={18} color={colors.ink} />
+        </Pressable>
+
+        <Text style={styles.note}>
+          Free for NC United Blue members and verified college coaches. Every wrestler can always
+          see their own ranking.
+        </Text>
       </View>
-
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.chips}
-        style={styles.chipStrip}
-      >
-        {shownClasses.map((c) => {
-          const active = c.graduationYear === activeYear
-          return (
-            <Pressable
-              key={c.graduationYear}
-              onPress={() => setActiveYear(c.graduationYear)}
-              style={[styles.chip, active && styles.chipActive]}
-            >
-              <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                {c.graduationYear}
-              </Text>
-              <Text style={[styles.chipCount, active && styles.chipCountActive]}>{c.count}</Text>
-            </Pressable>
-          )
-        })}
-      </ScrollView>
-
-      {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={colors.gold} />
-        </View>
-      ) : error ? (
-        <View style={styles.center}>
-          <Text style={styles.error}>{error}</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={prospects}
-          keyExtractor={(p) => String(p.id)}
-          renderItem={({ item }) => <RankRow prospect={item} />}
-          contentContainerStyle={styles.list}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.gold} />
-          }
-        />
-      )}
     </SafeAreaView>
   )
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.ink },
-  header: { paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: space.md },
-  eyebrow: { ...type.caption, color: colors.gold, marginBottom: space.xs },
-  title: { ...type.display, color: colors.text },
-  chipStrip: { flexGrow: 0, minHeight: 46, marginBottom: space.md },
-  chips: { paddingHorizontal: space.lg, gap: space.sm, alignItems: "center" },
-  chip: {
-    flexDirection: "row",
+  safe: { flex: 1, backgroundColor: colors.ink },
+  body: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: space.xl },
+  badge: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     alignItems: "center",
-    gap: space.sm,
-    paddingHorizontal: space.md,
-    paddingVertical: space.sm,
-    borderRadius: radius.pill,
+    justifyContent: "center",
+    backgroundColor: colors.raised,
     borderWidth: 1,
     borderColor: colors.line,
-    backgroundColor: colors.surface,
+    marginBottom: space.lg,
   },
-  chipActive: { backgroundColor: colors.gold, borderColor: colors.gold },
-  chipText: { ...type.label, color: colors.textSecondary },
-  chipTextActive: { color: colors.ink },
-  chipCount: { ...type.caption, color: colors.textMuted },
-  chipCountActive: { color: colors.ink },
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  gate: { flex: 1, alignItems: "center", justifyContent: "center", gap: space.md, paddingHorizontal: space.xl, paddingBottom: 80 },
-  gateTitle: { ...type.title, color: colors.text, textAlign: "center" },
-  gateBody: { ...type.body, color: colors.textSecondary, textAlign: "center", lineHeight: 21 },
-  gateButton: {
-    backgroundColor: colors.gold,
-    borderRadius: radius.md,
-    paddingVertical: space.lg,
-    paddingHorizontal: space.xl,
+  title: { ...type.title, color: colors.text, textAlign: "center" },
+  lede: {
+    ...type.body,
+    color: colors.textSecondary,
+    textAlign: "center",
     marginTop: space.sm,
+    marginBottom: space.xl,
   },
-  gateButtonText: { ...type.heading, color: colors.ink },
-  error: { ...type.body, color: colors.textSecondary, paddingHorizontal: space.xl, textAlign: "center" },
-  list: { paddingHorizontal: space.lg, paddingBottom: space.xxl, gap: space.sm },
-  photo: { width: 46, height: 46, borderRadius: radius.sm, backgroundColor: colors.raised },
-  photoEmpty: { alignItems: "center", justifyContent: "center" },
-  initials: { ...type.label, color: colors.textMuted, fontWeight: "800" },
-  schoolLine: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 2 },
-  schoolLogo: { width: 15, height: 15 },
-  badgeAA: { backgroundColor: colors.gold, borderColor: colors.gold },
-  badgeTextAA: { color: colors.ink },
-  badgeGold: { backgroundColor: "rgba(211, 181, 116, 0.15)", borderColor: colors.gold },
-  badgeTextGold: { color: colors.gold },
-  rowPressed: { opacity: 0.65 },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: space.md,
-    backgroundColor: colors.raised,
+  card: {
+    alignSelf: "stretch",
+    backgroundColor: colors.surface,
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.line,
-    padding: space.md,
+    padding: space.lg,
+    gap: space.md,
   },
-  rankBadge: {
-    width: 38,
-    height: 38,
-    borderRadius: radius.md,
+  row: { flexDirection: "row", alignItems: "flex-start" },
+  check: { marginRight: space.sm, marginTop: 2 },
+  rowText: { ...type.body, color: colors.textSecondary, flex: 1 },
+  cta: {
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.surface,
+    gap: space.sm,
+    alignSelf: "stretch",
+    backgroundColor: colors.gold,
+    borderRadius: radius.lg,
+    paddingVertical: space.lg,
+    marginTop: space.xl,
   },
-  rankBadgePodium: { backgroundColor: colors.gold },
-  rankText: { ...type.heading, color: colors.textSecondary },
-  rankTextPodium: { color: colors.ink },
-  rowBody: { flex: 1, gap: 3 },
-  name: { ...type.heading, color: colors.text },
-  school: { ...type.label, color: colors.textMuted, fontWeight: "500" },
-  badges: { flexDirection: "row", flexWrap: "wrap", gap: space.xs, marginTop: space.xs },
-  badge: {
-    paddingHorizontal: space.sm,
-    paddingVertical: 3,
-    borderRadius: radius.sm,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.line,
+  ctaPressed: { backgroundColor: colors.goldHover },
+  ctaDisabled: { opacity: 0.6 },
+  ctaText: { ...type.body, color: colors.ink, fontWeight: "700" },
+  note: {
+    ...type.caption,
+    color: colors.textMuted,
+    textAlign: "center",
+    marginTop: space.lg,
   },
-  badgeText: { ...type.caption, color: colors.gold, fontSize: 10 },
 })
