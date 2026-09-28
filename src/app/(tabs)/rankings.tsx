@@ -24,7 +24,9 @@ import { colors, radius, space, type } from "@/theme/tokens"
  */
 
 const WEB_BASE = process.env.EXPO_PUBLIC_WEB_BASE_URL ?? "https://app.ncwrestlingunited.com"
-const RANKINGS_URL = `${WEB_BASE}/rankings`
+// /public-rankings, not /rankings: the hub sends a member straight to the boards and anyone
+// without access back to the sales page on its own, so one link is right for every viewer.
+const RANKINGS_URL = `${WEB_BASE}/public-rankings`
 
 export default function RankingsScreen() {
   const [opening, setOpening] = useState(false)
@@ -54,7 +56,7 @@ export default function RankingsScreen() {
 
         <Text style={styles.title}>RecruitNC Rankings</Text>
         <Text style={styles.lede}>
-          North Carolina&apos;s top 30 in every class, ranked on results.
+          Class of 2027, 2028 and 2029, plus the Top 75 college prospects across every class.
         </Text>
 
         <View style={styles.card}>
