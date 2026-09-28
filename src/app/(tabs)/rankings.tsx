@@ -1,120 +1,269 @@
-import { useCallback, useState } from "react"
-import { Linking, Pressable, StyleSheet, Text, View } from "react-native"
+import { useCallback, useMemo, useState } from "react"
+import {
+  ActivityIndicator,
+  FlatList,
+  Image,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
+import { router, useFocusEffect } from "expo-router"
 import * as WebBrowser from "expo-web-browser"
 import Ionicons from "@expo/vector-icons/Ionicons"
+
 import { colors, radius, space, type } from "@/theme/tokens"
+import { fetchRankings, type RankedAthlete, type RankingBoard, type RankingsResult } from "@/lib/rankings"
 
 /**
- * Rankings open on the web, for now.
+ * The rankings, drawn on the phone rather than borrowed from the website.
  *
- * This tab used to read the `public_rankings` table straight from Supabase with the anon key,
- * which is bundled into the app. That was fine while the rankings were free; they are not any
- * more. The web gates them behind NC United Blue membership, coach verification or a RecruitNC
- * subscription, and a phone reading the table directly walked past all of it — the anon key is
- * in every copy of the app, so "only the app can read it" was never true either.
+ * This tab has been three things. It read `public_rankings` straight from Supabase with the
+ * anon key — a key that ships inside every copy of the app, so the paywall did nothing, and
+ * nothing kept that table in step with what was published, so it served no 2029 at all and a
+ * stale 2027. Then it became a button that opened the website: correct and properly gated, but
+ * a browser sitting inside an app, and invisible to anyone whose build was too old to receive
+ * the change.
  *
- * Two other things were wrong with the table and argue against going back to it: nothing syncs
- * it to what the web publishes, so it was six weeks stale, and it held 83 rows for a class
- * published as a top 30.
- *
- * Handing the browser the real page fixes all of it at once, ships as an over-the-air update
- * with no review cycle, and means the entitlement logic lives in exactly one place. A proper
- * in-app board comes later, reading an endpoint that checks the session.
+ * Now one authenticated endpoint returns every board, having run the same entitlement check the
+ * website runs, and this screen draws it. The member reads the same board the website
+ * publishes because both come from the same loaders.
  */
 
 const WEB_BASE = process.env.EXPO_PUBLIC_WEB_BASE_URL ?? "https://app.ncwrestlingunited.com"
-// /public-rankings, not /rankings: the hub sends a member straight to the boards and anyone
-// without access back to the sales page on its own, so one link is right for every viewer.
-const RANKINGS_URL = `${WEB_BASE}/public-rankings`
 
 export default function RankingsScreen() {
-  const [opening, setOpening] = useState(false)
-  const [failed, setFailed] = useState(false)
+  const [result, setResult] = useState<RankingsResult | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
+  const [activeKey, setActiveKey] = useState<string | null>(null)
 
-  const open = useCallback(async () => {
-    setOpening(true)
-    setFailed(false)
-
-    /*
-     * The spinner must not wait on the promise.
-     *
-     * `openBrowserAsync` resolves when the browser is *dismissed*, not when it opens, so
-     * awaiting it left the button reading "Opening…" for as long as somebody was reading the
-     * rankings - and for ever if the browser never presented at all. That is what "clicking
-     * rankings hangs" was: no timeout, no fallback, no error, just a tab frozen on a spinner.
-     *
-     * So the label clears on its own shortly after the call, and failure falls through to the
-     * system browser rather than dying silently.
-     */
-    const clearLabel = setTimeout(() => setOpening(false), 1500)
-
-    try {
-      // In-app browser rather than Safari: the session cookie a Blue member already has on the
-      // web comes with them, so they land on the rankings instead of a sign-in wall.
-      await WebBrowser.openBrowserAsync(RANKINGS_URL, {
-        toolbarColor: colors.ink,
-        controlsColor: colors.gold,
-      })
-    } catch {
-      // Safari as the fallback. It loses the cookie, so a member may have to sign in again -
-      // which is worse than the in-app browser and far better than a button that does nothing.
-      try {
-        await Linking.openURL(RANKINGS_URL)
-      } catch {
-        setFailed(true)
-      }
-    } finally {
-      clearTimeout(clearLabel)
-      setOpening(false)
+  const load = useCallback(async () => {
+    const next = await fetchRankings()
+    setResult(next)
+    if (next.state === "ok") {
+      // Keep the board they were reading across a refresh; otherwise start at the first.
+      setActiveKey((current) =>
+        current && next.boards.some((b) => b.key === current) ? current : (next.boards[0]?.key ?? null),
+      )
     }
   }, [])
 
+  /*
+   * Reload whenever the tab comes back into view, not only on mount.
+   *
+   * Signing in happens on another screen. With a mount-only fetch, a member who tapped "Sign
+   * in" here, signed in, and came back was still looking at the locked screen this screen had
+   * rendered before they had an account - which reads exactly like being refused.
+   */
+  useFocusEffect(
+    useCallback(() => {
+      void load()
+    }, [load]),
+  )
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true)
+    await load()
+    setRefreshing(false)
+  }, [load])
+
+  const board: RankingBoard | null = useMemo(() => {
+    if (!result || result.state !== "ok") return null
+    return result.boards.find((b) => b.key === activeKey) ?? result.boards[0] ?? null
+  }, [result, activeKey])
+
+  if (!result) {
+    return (
+      <SafeAreaView style={styles.safe} edges={["top"]}>
+        <View style={styles.centre}>
+          <ActivityIndicator color={colors.gold} />
+        </View>
+      </SafeAreaView>
+    )
+  }
+
+  if (result.state === "signed-out") {
+    return (
+      <Message
+        icon="lock-closed-outline"
+        title="Sign in to see the rankings"
+        body="Included with NC United Blue, and free for verified college coaches."
+        ctaLabel="Sign in"
+        onPress={() => router.push("/sign-in")}
+      />
+    )
+  }
+
+  if (result.state === "locked") {
+    return (
+      <Message
+        icon="trophy-outline"
+        title="Rankings"
+        body={result.message}
+        ctaLabel="See what's included"
+        onPress={() => {
+          void WebBrowser.openBrowserAsync(`${WEB_BASE.replace(/\/$/, "")}/rankings`, {
+            toolbarColor: colors.ink,
+            controlsColor: colors.gold,
+          })
+        }}
+      />
+    )
+  }
+
+  if (result.state === "error") {
+    return (
+      <Message
+        icon="alert-circle-outline"
+        title="Couldn't load rankings"
+        body={result.message}
+        ctaLabel="Try again"
+        onPress={() => void load()}
+      />
+    )
+  }
+
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
-      <View style={styles.body}>
-        <View style={styles.badge}>
-          <Ionicons name="trophy-outline" size={28} color={colors.gold} />
-        </View>
+      <View style={styles.header}>
+        <Text style={styles.eyebrow}>RECRUITNC</Text>
+        <Text style={styles.title}>Rankings</Text>
+      </View>
 
-        <Text style={styles.title}>RecruitNC Rankings</Text>
-        <Text style={styles.lede}>
-          Class of 2027, 2028 and 2029, plus the Top 75 college prospects across every class.
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.tabs}
+        style={styles.tabsRow}
+      >
+        {result.boards.map((b) => {
+          const active = b.key === board?.key
+          return (
+            <Pressable
+              key={b.key}
+              onPress={() => setActiveKey(b.key)}
+              style={[styles.tab, active && styles.tabActive]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+            >
+              <Text style={[styles.tabText, active && styles.tabTextActive]}>{shortTitle(b)}</Text>
+            </Pressable>
+          )
+        })}
+      </ScrollView>
+
+      <FlatList
+        data={board?.athletes ?? []}
+        keyExtractor={(a) => a.athleteId}
+        renderItem={({ item }) => <Row athlete={item} />}
+        contentContainerStyle={styles.list}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.gold} />
+        }
+        ListFooterComponent={
+          <Text style={styles.footnote}>
+            Ranked on results: who they wrestled, how they did against them, and what they have done
+            outside this state.
+          </Text>
+        }
+      />
+    </SafeAreaView>
+  )
+}
+
+/** "Class of 2027" is too wide for a phone tab; beside the others the year alone reads fine. */
+function shortTitle(board: RankingBoard): string {
+  return /^\d{4}$/.test(board.key) ? board.key : `Top ${board.cap}`
+}
+
+function Row({ athlete }: { athlete: RankedAthlete }) {
+  const meta = [athlete.weightClass ? `${athlete.weightClass} lbs` : null, athlete.highSchool]
+    .filter(Boolean)
+    .join(" · ")
+
+  return (
+    <Pressable
+      style={styles.row}
+      onPress={() => router.push(`/athlete/${athlete.athleteId}`)}
+      accessibilityRole="button"
+      accessibilityLabel={`${athlete.name}, ranked ${athlete.rank}`}
+    >
+      <Text style={styles.rank}>{athlete.rank}</Text>
+
+      {athlete.photoUrl ? (
+        <Image source={{ uri: athlete.photoUrl }} style={styles.avatar} />
+      ) : (
+        <View style={[styles.avatar, styles.avatarEmpty]}>
+          <Text style={styles.initials}>{initials(athlete.name)}</Text>
+        </View>
+      )}
+
+      <View style={styles.rowBody}>
+        <Text style={styles.name} numberOfLines={1}>
+          {athlete.name}
         </Text>
-
-        <View style={styles.card}>
-          {[
-            "Every match scored, weighted to this season",
-            "NHSCA, Super 32, Fargo and Journeymen",
-            "Head-to-head settles a tie",
-            "Every win graded by who it was over",
-          ].map((line) => (
-            <View key={line} style={styles.row}>
-              <Ionicons name="checkmark" size={16} color={colors.gold} style={styles.check} />
-              <Text style={styles.rowText}>{line}</Text>
-            </View>
-          ))}
-        </View>
-
-        <Pressable
-          onPress={open}
-          disabled={opening}
-          style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed, opening && styles.ctaDisabled]}
-        >
-          <Text style={styles.ctaText}>{opening ? "Opening…" : "Open rankings"}</Text>
-          <Ionicons name="open-outline" size={18} color={colors.ink} />
-        </Pressable>
-
-        {failed ? (
-          /* Never a dead end: if neither browser will open, the address is on screen to type. */
-          <Text style={styles.note}>
-            Could not open the browser. Go to app.ncwrestlingunited.com/public-rankings
+        {meta ? (
+          <Text style={styles.meta} numberOfLines={1}>
+            {meta}
           </Text>
         ) : null}
+        {athlete.credentials.length > 0 ? (
+          <View style={styles.pills}>
+            {athlete.credentials.slice(0, 2).map((c) => (
+              <View key={c.kind} style={styles.pill}>
+                <Text style={styles.pillText}>{c.label.toUpperCase()}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+        {athlete.collegeCommit ? (
+          <Text style={styles.commit} numberOfLines={1}>
+            Committed · {athlete.collegeCommit}
+          </Text>
+        ) : null}
+      </View>
 
-        <Text style={styles.note}>
-          Free for NC United Blue members and verified college coaches.
-        </Text>
+      <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+    </Pressable>
+  )
+}
+
+function initials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? "")
+    .join("")
+}
+
+function Message({
+  icon,
+  title,
+  body,
+  ctaLabel,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap
+  title: string
+  body: string
+  ctaLabel: string
+  onPress: () => void
+}) {
+  return (
+    <SafeAreaView style={styles.safe} edges={["top"]}>
+      <View style={styles.centre}>
+        <View style={styles.badge}>
+          <Ionicons name={icon} size={28} color={colors.gold} />
+        </View>
+        <Text style={styles.messageTitle}>{title}</Text>
+        <Text style={styles.messageBody}>{body}</Text>
+        <Pressable onPress={onPress} style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}>
+          <Text style={styles.ctaText}>{ctaLabel}</Text>
+        </Pressable>
       </View>
     </SafeAreaView>
   )
@@ -122,7 +271,62 @@ export default function RankingsScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.ink },
-  body: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: space.xl },
+  centre: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: space.xl },
+
+  header: { paddingHorizontal: space.lg, paddingTop: space.md, paddingBottom: space.sm },
+  eyebrow: { ...type.caption, color: colors.gold },
+  title: { ...type.title, color: colors.text, marginTop: 2 },
+
+  tabsRow: { flexGrow: 0 },
+  tabs: { paddingHorizontal: space.lg, paddingBottom: space.sm, gap: space.sm },
+  tab: {
+    paddingHorizontal: space.md,
+    paddingVertical: 8,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface,
+  },
+  tabActive: { borderColor: colors.gold, backgroundColor: colors.raised },
+  tabText: { ...type.label, color: colors.textSecondary },
+  tabTextActive: { color: colors.gold },
+
+  list: { paddingHorizontal: space.lg, paddingBottom: space.xl },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.sm,
+    paddingVertical: space.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.line,
+  },
+  rank: { ...type.body, color: colors.gold, fontWeight: "800", width: 30, textAlign: "center" },
+  avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surface },
+  avatarEmpty: { alignItems: "center", justifyContent: "center" },
+  initials: { ...type.caption, color: colors.textSecondary },
+  rowBody: { flex: 1 },
+  name: { ...type.body, color: colors.text, fontWeight: "700" },
+  meta: { ...type.label, color: colors.textSecondary, marginTop: 1 },
+  commit: { ...type.label, color: colors.gold, marginTop: 2 },
+  pills: { flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 4 },
+  pill: {
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.raised,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+  },
+  pillText: { fontSize: 9, fontWeight: "800", color: colors.textSecondary, letterSpacing: 0.4 },
+
+  footnote: {
+    ...type.label,
+    color: colors.textMuted,
+    textAlign: "center",
+    marginTop: space.lg,
+    paddingHorizontal: space.md,
+  },
+
   badge: {
     width: 64,
     height: 64,
@@ -134,44 +338,20 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     marginBottom: space.lg,
   },
-  title: { ...type.title, color: colors.text, textAlign: "center" },
-  lede: {
+  messageTitle: { ...type.title, color: colors.text, textAlign: "center" },
+  messageBody: {
     ...type.body,
     color: colors.textSecondary,
     textAlign: "center",
     marginTop: space.sm,
-    marginBottom: space.xl,
+    marginBottom: space.lg,
   },
-  card: {
-    alignSelf: "stretch",
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.line,
-    padding: space.lg,
-    gap: space.md,
-  },
-  row: { flexDirection: "row", alignItems: "flex-start" },
-  check: { marginRight: space.sm, marginTop: 2 },
-  rowText: { ...type.body, color: colors.textSecondary, flex: 1 },
   cta: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: space.sm,
-    alignSelf: "stretch",
     backgroundColor: colors.gold,
-    borderRadius: radius.lg,
-    paddingVertical: space.lg,
-    marginTop: space.xl,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.sm,
+    borderRadius: radius.md,
   },
-  ctaPressed: { backgroundColor: colors.goldHover },
-  ctaDisabled: { opacity: 0.6 },
-  ctaText: { ...type.body, color: colors.ink, fontWeight: "700" },
-  note: {
-    ...type.caption,
-    color: colors.textMuted,
-    textAlign: "center",
-    marginTop: space.lg,
-  },
+  ctaPressed: { opacity: 0.85 },
+  ctaText: { ...type.body, color: colors.ink, fontWeight: "800" },
 })
