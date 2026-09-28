@@ -5,7 +5,6 @@ import {
   Image,
   Pressable,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -133,12 +132,14 @@ export default function RankingsScreen() {
         <Text style={styles.title}>Rankings</Text>
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.tabs}
-        style={styles.tabsRow}
-      >
+      {/*
+        * A plain row, not a horizontal ScrollView.
+        *
+        * The ScrollView took its height from its content and got it wrong, cropping the digits
+        * off "2027" halfway down. Four tabs fit across a phone with room to spare, so the
+        * scroller bought nothing and cost the one thing that had to be right.
+        */}
+      <View style={styles.tabs}>
         {result.boards.map((b) => {
           const active = b.key === board?.key
           return (
@@ -153,7 +154,7 @@ export default function RankingsScreen() {
             </Pressable>
           )
         })}
-      </ScrollView>
+      </View>
 
       <FlatList
         data={board?.athletes ?? []}
@@ -277,18 +278,34 @@ const styles = StyleSheet.create({
   eyebrow: { ...type.caption, color: colors.gold },
   title: { ...type.title, color: colors.text, marginTop: 2 },
 
-  tabsRow: { flexGrow: 0 },
-  tabs: { paddingHorizontal: space.lg, paddingBottom: space.sm, gap: space.sm },
+  /*
+   * The row is sized, not squeezed.
+   *
+   * A horizontal ScrollView takes its height from its content, and with only vertical padding
+   * to go on it cropped the descenders off "2027" against the first row of the list. An
+   * explicit line height on the label and real breathing room underneath fixes both the
+   * clipping and the crowding.
+   */
+  tabs: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    paddingHorizontal: space.lg,
+    paddingTop: space.xs,
+    paddingBottom: space.md,
+    gap: space.sm,
+  },
   tab: {
-    paddingHorizontal: space.md,
+    minHeight: 38,
+    justifyContent: "center",
+    paddingHorizontal: space.lg,
     paddingVertical: 8,
-    borderRadius: radius.sm,
+    borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.line,
     backgroundColor: colors.surface,
   },
   tabActive: { borderColor: colors.gold, backgroundColor: colors.raised },
-  tabText: { ...type.label, color: colors.textSecondary },
+  tabText: { ...type.label, lineHeight: 18, color: colors.textSecondary },
   tabTextActive: { color: colors.gold },
 
   list: { paddingHorizontal: space.lg, paddingBottom: space.xl },
