@@ -29,7 +29,9 @@ type Bubble = ChatTurn & { id: string; messageId?: string; vote?: "up" | "down";
  */
 const SUGGESTIONS = [
   "Who are our 4x state champions?",
-  "Show me all class of 2027 rankings",
+  // Not a rankings prompt: rankings are paid, and the handler refuses every one of them by
+  // design, so offering it here was an invitation to be turned down.
+  "Who are the 4x state placers?",
   "Who is the all-time winningest wrestler?",
 ]
 
