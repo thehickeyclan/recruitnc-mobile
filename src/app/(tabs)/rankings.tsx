@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react"
-import { Pressable, StyleSheet, Text, View } from "react-native"
+import { Linking, Pressable, StyleSheet, Text, View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import * as WebBrowser from "expo-web-browser"
 import Ionicons from "@expo/vector-icons/Ionicons"
@@ -30,9 +30,25 @@ const RANKINGS_URL = `${WEB_BASE}/public-rankings`
 
 export default function RankingsScreen() {
   const [opening, setOpening] = useState(false)
+  const [failed, setFailed] = useState(false)
 
   const open = useCallback(async () => {
     setOpening(true)
+    setFailed(false)
+
+    /*
+     * The spinner must not wait on the promise.
+     *
+     * `openBrowserAsync` resolves when the browser is *dismissed*, not when it opens, so
+     * awaiting it left the button reading "Opening…" for as long as somebody was reading the
+     * rankings - and for ever if the browser never presented at all. That is what "clicking
+     * rankings hangs" was: no timeout, no fallback, no error, just a tab frozen on a spinner.
+     *
+     * So the label clears on its own shortly after the call, and failure falls through to the
+     * system browser rather than dying silently.
+     */
+    const clearLabel = setTimeout(() => setOpening(false), 1500)
+
     try {
       // In-app browser rather than Safari: the session cookie a Blue member already has on the
       // web comes with them, so they land on the rankings instead of a sign-in wall.
@@ -41,8 +57,15 @@ export default function RankingsScreen() {
         controlsColor: colors.gold,
       })
     } catch {
-      // Nothing to recover: the button simply becomes pressable again.
+      // Safari as the fallback. It loses the cookie, so a member may have to sign in again -
+      // which is worse than the in-app browser and far better than a button that does nothing.
+      try {
+        await Linking.openURL(RANKINGS_URL)
+      } catch {
+        setFailed(true)
+      }
     } finally {
+      clearTimeout(clearLabel)
       setOpening(false)
     }
   }, [])
@@ -82,9 +105,15 @@ export default function RankingsScreen() {
           <Ionicons name="open-outline" size={18} color={colors.ink} />
         </Pressable>
 
+        {failed ? (
+          /* Never a dead end: if neither browser will open, the address is on screen to type. */
+          <Text style={styles.note}>
+            Could not open the browser. Go to app.ncwrestlingunited.com/public-rankings
+          </Text>
+        ) : null}
+
         <Text style={styles.note}>
-          Free for NC United Blue members and verified college coaches. Every wrestler can always
-          see their own ranking.
+          Free for NC United Blue members and verified college coaches.
         </Text>
       </View>
     </SafeAreaView>
