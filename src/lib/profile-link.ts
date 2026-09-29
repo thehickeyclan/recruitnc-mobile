@@ -66,8 +66,11 @@ async function signedInUrl(path: string): Promise<string | null> {
 
 export function openAthleteProfile(athleteId: string | null | undefined): void {
   const path = athleteId ? profilePath(athleteId) : null
-  if (!path) return
+  if (path) openWebPage(path)
+}
 
+/** Any page on the website, in the tinted sheet, signed in as this account when there is one. */
+export function openWebPage(path: string): void {
   void signedInUrl(path).then((url) => {
     if (!url) return
     return WebBrowser.openBrowserAsync(url, {

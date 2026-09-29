@@ -7,6 +7,7 @@ import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors, radius, space, type } from "@/theme/tokens"
 import { openAthleteProfile } from "@/lib/profile-link"
 import { claimAthleteProfile, currentUserId, loadAthleteEdits } from "@/lib/athlete-edit"
+import { fetchScoutingAccess } from "@/lib/scouting-report"
 import {
   fetchAthleteProfile,
   profileMetaLine,
@@ -115,6 +116,20 @@ export default function AthleteProfileScreen() {
     void checkStanding()
   }, [checkStanding])
 
+  /*
+   * The scouting report is for college coaches, and the server says who that is — the same test
+   * the website's button runs. Anyone else never sees the button, rather than a button that
+   * refuses them.
+   */
+  const [scoutingReport, setScoutingReport] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    void fetchScoutingAccess(String(id)).then((available) => !cancelled && setScoutingReport(available))
+    return () => {
+      cancelled = true
+    }
+  }, [id])
+
   const claim = (as: "self" | "parent") => {
     setClaiming(true)
     void claimAthleteProfile(String(id), as)
@@ -212,6 +227,16 @@ export default function AthleteProfileScreen() {
             </View>
           </View>
 
+          {scoutingReport ? (
+            <Pressable
+              style={styles.ownerAction}
+              onPress={() => router.push({ pathname: "/scouting-report/[id]", params: { id: String(id) } })}
+            >
+              <Ionicons name="document-text" size={16} color={colors.ink} />
+              <Text style={styles.ownerActionText}>Scouting report</Text>
+            </Pressable>
+          ) : null}
+
           {standing === "mine" ? (
             <Pressable
               style={styles.ownerAction}
@@ -222,7 +247,8 @@ export default function AthleteProfileScreen() {
               <Ionicons name="create" size={16} color={colors.ink} />
               <Text style={styles.ownerActionText}>Edit profile</Text>
             </Pressable>
-          ) : standing === "other" || standing === "signed-out" ? (
+          ) : (standing === "other" || standing === "signed-out") && !scoutingReport ? (
+            // Not for a coach: whoever can pull the scouting report is not the wrestler.
             <View style={styles.claimCard}>
               <Text style={styles.claimTitle}>Is this you?</Text>
               <Text style={styles.claimBody}>
