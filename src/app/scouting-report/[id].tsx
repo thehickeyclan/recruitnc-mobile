@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react"
-import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native"
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { Image } from "expo-image"
 import * as WebBrowser from "expo-web-browser"
@@ -8,6 +8,7 @@ import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors, radius, space, type } from "@/theme/tokens"
 import { fetchScoutingReport } from "@/lib/scouting-report"
 import { openWebPage } from "@/lib/profile-link"
+import { shareScoutingReportPdf } from "@/lib/scouting-report-pdf"
 import {
   STANDING_LABEL,
   dayLabel,
@@ -32,7 +33,8 @@ import {
  * Every section that can be empty says so in words. An omitted fact on this report has been read
  * as a gap to fill before, and a coach scanning on a phone is the reader most likely to assume.
  *
- * The PDF still comes from the website (the print layout lives there), opened signed in.
+ * PDF builds the document on the phone and hands it to the share sheet — text it, mail it, save it
+ * to Files. A binary too old to build one opens the website's printable report instead, signed in.
  */
 
 const BAND_COLOR: Record<ScoutingReport["strengthOfCompetition"]["grade"]["band"], string> = {
@@ -211,8 +213,17 @@ function Report({ report }: { report: ScoutingReport }) {
         <Vital label="High school" value={identity.highSchool} />
         <Vital label="Club" value={identity.club} />
         <Vital label="Career" value={report.careerRecord} />
-        <Vital label="Cell" value={contact.cell} onPress={contact.cell ? () => void Linking.openURL(`tel:${contact.cell}`) : undefined} />
-        <Vital label="Email" value={contact.email} onPress={contact.email ? () => void Linking.openURL(`mailto:${contact.email}`) : undefined} />
+        {/* Gated here as well as on the server: a minor's number is only ever drawn for the full tier. */}
+        <Vital
+          label="Cell"
+          value={full ? contact.cell : null}
+          onPress={full && contact.cell ? () => void Linking.openURL(`tel:${contact.cell}`) : undefined}
+        />
+        <Vital
+          label="Email"
+          value={full ? contact.email : null}
+          onPress={full && contact.email ? () => void Linking.openURL(`mailto:${contact.email}`) : undefined}
+        />
         {!full ? <Note>Contact details released to verified college coaching staff.</Note> : null}
       </View>
 
@@ -392,6 +403,16 @@ export default function ScoutingReportScreen() {
   const [report, setReport] = useState<ScoutingReport | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [sharing, setSharing] = useState(false)
+
+  const sharePdf = async () => {
+    if (!report || sharing) return
+    setSharing(true)
+    const result = await shareScoutingReportPdf(report)
+    setSharing(false)
+    if (result === "unavailable") openWebPage(`/athletes/${encodeURIComponent(String(id))}/scouting-report`)
+    else if (result === "failed") Alert.alert("Could not make the PDF", "Try again in a moment.")
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -420,10 +441,15 @@ export default function ScoutingReportScreen() {
           <Pressable
             hitSlop={12}
             style={styles.back}
-            onPress={() => openWebPage(`/athletes/${encodeURIComponent(String(id))}/scouting-report`)}
-            accessibilityLabel="Open the printable PDF on the web"
+            disabled={sharing}
+            onPress={() => void sharePdf()}
+            accessibilityLabel="Share the scouting report as a PDF"
           >
-            <Ionicons name="document-text-outline" size={18} color={colors.gold} />
+            {sharing ? (
+              <ActivityIndicator size="small" color={colors.gold} />
+            ) : (
+              <Ionicons name="share-outline" size={18} color={colors.gold} />
+            )}
             <Text style={styles.backText}> PDF</Text>
           </Pressable>
         ) : null}
