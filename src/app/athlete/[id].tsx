@@ -311,7 +311,8 @@ export default function AthleteProfileScreen() {
             </Section>
           ) : null}
 
-          {/* The match log, highlights and academics still live on the website. */}
+          {/* The match log, highlights, academics and the coaches' scouting report still live on
+              the website. It opens signed in as this account — see lib/profile-link. */}
           <Pressable style={styles.webLink} onPress={() => openAthleteProfile(athlete.id)}>
             <Ionicons name="open-outline" size={16} color={colors.gold} />
             <Text style={styles.webLinkText}>Full profile on the web</Text>
