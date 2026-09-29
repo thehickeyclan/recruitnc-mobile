@@ -77,7 +77,7 @@ export default function MyWrestlersScreen() {
         ) : (
           <>
             <Text style={styles.muted}>
-              Linked wrestlers get college-interest alerts on this phone: when a college program views their
+              Linked Blue members get college-interest alerts on this phone: when a college program views their
               profile, you&apos;ll know which school.
             </Text>
 
