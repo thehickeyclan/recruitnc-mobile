@@ -221,6 +221,26 @@ export default function BlueSubscriptionScreen() {
 
         {memberships.map((membership) => {
           const ended = membership.status === "cancelled" || membership.status === "alumni"
+          // A scholarship has no subscription behind it: nothing to update, pause or cancel.
+          if (membership.comped && !ended) {
+            return (
+              <View key={membership.id} style={styles.card}>
+                <View style={styles.cardHeader}>
+                  <View style={styles.flex}>
+                    <Text style={styles.cardTitle}>{membership.athleteName}</Text>
+                    <Text style={styles.plan}>Blue Membership · Scholarship</Text>
+                  </View>
+                  <View style={[styles.badge, styles.badgeActive]}>
+                    <Text style={styles.badgeText}>{membership.status === "paused" ? "Paused" : "Active"}</Text>
+                  </View>
+                </View>
+                <View style={styles.details}>
+                  <View style={styles.detailRow}><Text style={styles.detailLabel}>Member since</Text><Text style={styles.detailValue}>{dateLabel(membership.startedAt)}</Text></View>
+                  <View style={styles.detailRow}><Text style={styles.detailLabel}>Billing</Text><Text style={styles.detailValue}>None — scholarship</Text></View>
+                </View>
+              </View>
+            )
+          }
           const working = busyId === membership.id
           const card = membership.cardBrand && membership.cardLast4
             ? `${membership.cardBrand.toUpperCase()} •••• ${membership.cardLast4}`

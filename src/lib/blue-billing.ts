@@ -21,6 +21,8 @@ export type BlueBillingMembership = {
   planName: string | null
   source: "live" | "cached" | "unavailable"
   recentInvoices: { id: string; date: string; amountFormatted: string; status: string }[]
+  /** A scholarship or staff place: a member with nothing to bill, pause or cancel. */
+  comped?: boolean
 }
 
 async function authHeaders(): Promise<Record<string, string>> {
