@@ -17,6 +17,8 @@ import {
 } from "@/lib/blue-billing"
 import { colors, radius, space, type } from "@/theme/tokens"
 
+const WEB_BASE = (process.env.EXPO_PUBLIC_WEB_BASE_URL ?? "https://app.ncwrestlingunited.com").replace(/\/$/, "")
+
 function dateLabel(value: string | null): string {
   if (!value) return "Not available"
   return new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
@@ -241,6 +243,21 @@ export default function BlueSubscriptionScreen() {
                 <View style={styles.detailRow}><Text style={styles.detailLabel}>Payment method</Text><Text style={styles.detailValue}>{card}</Text></View>
               </View>
 
+              {/*
+                A lapsed membership had no way back from here. A Stripe subscription cannot be
+                restarted once cancelled, so rejoining is a new registration - open it directly
+                rather than leaving the family to find the interest form, which is for strangers.
+                Graduated wrestlers ("alumni") are not offered it.
+              */}
+              {membership.status === "cancelled" ? (
+                <Pressable
+                  style={styles.primaryButton}
+                  onPress={() => void WebBrowser.openBrowserAsync(`${WEB_BASE}/blue/register`)}
+                >
+                  <Ionicons name="refresh-circle-outline" size={18} color={colors.ink} />
+                  <Text style={styles.primaryText}>Rejoin Blue</Text>
+                </Pressable>
+              ) : null}
               {membership.stripeCustomerId && !ended ? (
                 <Pressable style={styles.primaryButton} disabled={working} onPress={() => void openPortal(membership)}>
                   {working ? <ActivityIndicator color={colors.ink} /> : <Ionicons name="card-outline" size={18} color={colors.ink} />}
