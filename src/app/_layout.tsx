@@ -6,6 +6,7 @@ import { StatusBar } from "expo-status-bar"
 import * as SplashScreen from "expo-splash-screen"
 import { colors } from "@/theme/tokens"
 import { useFirstLaunchUpdate } from "@/lib/first-launch-update"
+import { usePushAccountSync } from "@/lib/push-account-sync"
 
 void SplashScreen.preventAutoHideAsync()
 
@@ -42,6 +43,7 @@ export default function RootLayout() {
   // resolves immediately.
   const ready = useFirstLaunchUpdate()
   useNotificationTaps()
+  usePushAccountSync()
 
   useEffect(() => {
     if (ready) void SplashScreen.hideAsync()

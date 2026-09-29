@@ -3,6 +3,7 @@ import * as Notifications from "expo-notifications"
 import Constants from "expo-constants"
 import { Platform } from "react-native"
 import { clientHeader } from "@/lib/client-header"
+import { supabase } from "@/lib/supabase"
 
 const BASE = process.env.EXPO_PUBLIC_WEB_BASE_URL
 
@@ -14,6 +15,8 @@ export type AlertPrefs = {
   news: boolean
   /** Day-before reminders for the college teams this device follows. */
   college: boolean
+  /** "A college program viewed your wrestler's profile" - needs a signed-in, linked account. */
+  programViews: boolean
 }
 
 /**
@@ -35,6 +38,8 @@ export const DEFAULT_PREFS: AlertPrefs = {
   // went and chose. Defaulting it off would mean following a team and then hunting for a switch
   // to hear about it.
   college: true,
+  // On: it only ever fires for this family's own wrestler, and it is the alert parents want most.
+  programViews: true,
 }
 
 /** Merge older saved shapes over today's defaults so upgrades do not disable new alerts. */
@@ -99,11 +104,22 @@ export async function registerForPush(): Promise<string> {
  * Registration goes through the web app rather than an anon Supabase insert, so the token format
  * is validated server-side and push_devices needs no publicly writable RLS policy.
  */
-export async function syncDevice(token: string, prefs: AlertPrefs): Promise<void> {
+export async function syncDevice(token: string, prefs: AlertPrefs, options?: { signedOut?: boolean }): Promise<void> {
+  /*
+   * Sent with the session when there is one, so the phone is tied to the account - that is what
+   * lets "a college viewed your wrestler" reach this family and no one else. Signed out, the
+   * server unties it.
+   */
+  const { data } = await supabase.auth.getSession()
+  const accessToken = options?.signedOut ? null : data.session?.access_token
   const response = await fetch(`${BASE}/api/push/register`, {
     method: "POST",
-    headers: { ...clientHeader(), "Content-Type": "application/json" },
-    body: JSON.stringify({ expoPushToken: token, platform: Platform.OS, prefs }),
+    headers: {
+      ...clientHeader(),
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+    body: JSON.stringify({ expoPushToken: token, platform: Platform.OS, prefs, signedOut: options?.signedOut === true }),
   })
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as { error?: string } | null

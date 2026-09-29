@@ -30,6 +30,11 @@ const ALERTS: { key: keyof AlertPrefs; title: string; detail: string }[] = [
     // chosen on the calendar, which is why it can default on where calendar reminders cannot.
     detail: "The day before a team you follow wrestles",
   },
+  {
+    key: "programViews",
+    title: "College interest",
+    detail: "When a college program views your wrestler's profile. Sign in and link your wrestler to get these.",
+  },
 ]
 
 export default function MoreScreen() {
@@ -131,6 +136,14 @@ export default function MoreScreen() {
                 <Text style={styles.rowDetail}>{session?.user?.email ?? ""}</Text>
               </View>
             </View>
+            {/* Linking is what college-interest alerts, editing and Blue all hang off. */}
+            <Pressable style={[styles.row, styles.rowDivider]} onPress={() => router.push("/my-wrestlers" as never)}>
+              <View style={styles.rowBody}>
+                <Text style={styles.rowTitle}>My wrestlers</Text>
+                <Text style={styles.rowDetail}>Link your wrestler for college-interest alerts and profile editing</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            </Pressable>
             <Pressable
               style={[styles.row, styles.rowDivider]}
               onPress={() => void WebBrowser.openBrowserAsync(`${WEB}/rankings`, {
