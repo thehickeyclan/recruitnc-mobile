@@ -33,13 +33,19 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />,
         }}
       />
-      {/* The tournament earns a tab of its own until 19 September. It was reachable only through
-          a chevron on the Home card and a row inside More, and neither is somewhere people look. */}
+      {/* The tournament had this slot until 19 September and has now been wrestled. It keeps its
+          screen and its rows in More; Athletes takes the tab, because a wrestler who is not
+          ranked and has not committed was otherwise unreachable in the app - which is most of
+          them, and all of the ones we want claiming their profiles. */}
       <Tabs.Screen
         name="toc"
+        options={{ href: null }}
+      />
+      <Tabs.Screen
+        name="athletes"
         options={{
-          title: "TOC",
-          tabBarIcon: ({ color, size }) => <Ionicons name="trophy" size={size} color={color} />,
+          title: "Athletes",
+          tabBarIcon: ({ color, size }) => <Ionicons name="people" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
