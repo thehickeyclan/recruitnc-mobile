@@ -7,7 +7,7 @@
  * weight "up 115 lbs"). Kept free of react-native imports so they can be tested.
  */
 
-export type BoutReason = "national-ranked" | "toc-field" | "ranked" | "state-champion" | "state-placer"
+export type BoutReason = "national-ranked" | "toc-field" | "ranked" | "state-champion" | "state-placer" | "national-placer"
 
 export type ReportBout = {
   opponent: string
@@ -18,9 +18,24 @@ export type ReportBout = {
   reason: BoutReason
   stateLabel?: string
   nationalRankLabel?: string
+  /** Sent by the server; the report files a bout in-state or national by it. */
+  opponentState?: string | null
+  fargoLabel?: string
+  /** On family-reported wins: the accolade as they gave it. */
+  credential?: string
 }
 
-export type ReportResultRow = { event: string; year: number; detail: string; date: string | null; weight: string | null }
+export type ReportResultRow = {
+  event: string
+  year: number
+  detail: string
+  date: string | null
+  weight: string | null
+  /** From the full event name - the short names ("Tar Heel State Classic") do not say. */
+  style?: WrestlingStyle
+}
+
+export type WrestlingStyle = "folkstyle" | "freestyle" | "greco"
 
 export type ScoutingReport = {
   athleteId: string
@@ -44,6 +59,7 @@ export type ScoutingReport = {
     highlightVideoUrl: string | null
     floProfileUrl: string | null
     trackWrestlingProfileUrl: string | null
+    instagramUrl?: string | null
   }
   academics: {
     gpa: string | null
@@ -63,6 +79,9 @@ export type ScoutingReport = {
     rankedWins: { national: number; tocField: number; stateRanked: number; total: number }
     credentialedLosses: number
     seasonsOnFile: number
+    /** Team-blind national events entered, and off-season entries (the "6/6" grade's inputs). */
+    nationalEvents?: string[]
+    offSeasonEvents?: number
     grade: {
       score: number
       band: "red" | "orange" | "amber" | "green"
@@ -88,8 +107,21 @@ export type ScoutingReport = {
     stars: number
     score: number
     provisional: boolean
-    components: { key: string; label: string; points: number; max: number; detail: string }[]
+    components: {
+      key: string
+      label: string
+      points: number
+      max: number
+      detail: string
+      parts?: { label: string; detail: string }[]
+    }[]
+    /** When a credential, not the score, set the stars. */
+    floor?: string
   } | null
+  /** Wins a family reported, with the opponent's accolade as they gave it. */
+  reportedWins?: { opponent: string; opponentSchool: string | null; event: string | null; date: string | null; result: string | null; credential: string }[]
+  /** How far and in which styles he competes (the website's Competes line). */
+  competition?: { scope: "national" | "in-state"; nationalEvents: string[]; styles: WrestlingStyle[] }
   accessTier: "intelligence" | "full"
   watermark: string | null
 }
@@ -171,12 +203,16 @@ export const STANDING_LABEL: Record<BoutReason, string> = {
   ranked: "NC ranked",
   "state-champion": "State champ",
   "state-placer": "State placer",
+  "national-placer": "Nat'l placer",
 }
 
 const BOUT_GROUPS: { title: string; reasons: BoutReason[] }[] = [
   { title: "nationally ranked opponents", reasons: ["national-ranked"] },
   { title: "NC-ranked opponents", reasons: ["ranked", "toc-field"] },
   { title: "state champions & placers", reasons: ["state-champion", "state-placer"] },
+  // Super 32 / NHSCA / Journeymen / Beast / Ironman placers with no state placing on file. These
+  // were missing here, so the app's report silently dropped those wins.
+  { title: "national tournament placers", reasons: ["national-placer"] },
 ]
 
 /** Bouts split by the opponent's standing, strongest first; empty groups dropped. */
@@ -200,4 +236,31 @@ export function noBoutsLine(kind: "win" | "loss"): string {
 /** The status chip: a commitment names the school, otherwise the stated status, otherwise "Uncommitted". */
 export function statusLine(report: Pick<ScoutingReport, "commitment" | "recruitingStatus">): string {
   return report.commitment ? `Committed · ${report.commitment}` : (report.recruitingStatus ?? "Uncommitted")
+}
+
+/**
+ * Folkstyle or an Olympic style, as the website decides it: the division after " - " wins
+ * ("NC Freestyle & Greco State Championships - 16U Boys Freestyle" is freestyle), Fargo with no
+ * style named is freestyle, everything else is folkstyle.
+ */
+export function styleOfEvent(...parts: Array<string | null | undefined>): WrestlingStyle {
+  const divisions = parts.filter(Boolean).map(String).filter((p) => p.includes(" - ")).map((p) => p.split(" - ").pop()!)
+  const text = (divisions.length ? divisions : parts.filter(Boolean)).join(" ").toLowerCase()
+  if (/\bgreco\b/.test(text)) return "greco"
+  if (/\bfreestyle\b|\bfargo\b/.test(text)) return "freestyle"
+  return "folkstyle"
+}
+
+export const isOlympic = (style: WrestlingStyle) => style !== "folkstyle"
+
+/** Out-of-state opponents are "national" wherever the bout was wrestled. */
+export function isOutOfState(bout: ReportBout): boolean {
+  if (bout.credential) return !/\b(NC|N\.C\.|North Carolina|NCHSAA|NCISA)\b/i.test(bout.credential)
+  return !!bout.opponentState && bout.opponentState.toUpperCase() !== "NC"
+}
+
+/** A family-reported win, filed by the accolade they gave. */
+export function reportedBout(win: NonNullable<ScoutingReport["reportedWins"]>[number]): ReportBout {
+  const reason: BoutReason = /national|#\d/i.test(win.credential) ? "national-ranked" : /champ/i.test(win.credential) ? "state-champion" : "state-placer"
+  return { ...win, reason, credential: win.credential }
 }

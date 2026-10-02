@@ -66,13 +66,13 @@ describe("reportHtml", () => {
   it("carries the subject, the ranking chip and the commitment", () => {
     const html = reportHtml(report())
     expect(html).toContain("Carson Worrick")
-    expect(html).toContain("NC #1 · Class of 2027")
+    expect(html).toContain("RecruitNC #1  ·  Class of 2027")
     expect(html).toContain("Committed · Binghamton")
   })
 
   it("states every empty section rather than leaving it blank", () => {
     const html = reportHtml(report())
-    expect(html).toContain("No tournament results on file.")
+    expect(html).toContain("No folkstyle tournament results on file.")
     expect(html).toContain("No wins over nationally ranked")
     expect(html).toContain("No losses to nationally ranked")
   })
@@ -98,6 +98,19 @@ describe("reportHtml", () => {
     )
     expect(html).not.toContain("<script>x")
     expect(html).toContain("&lt;script&gt;")
+  })
+
+  it("files freestyle and Greco results after folkstyle, behind their own divider", () => {
+    const html = reportHtml(
+      report({
+        results: [
+          { event: "NCHSAA State Championships", year: 2026, detail: "7A · 150 · 2nd", date: null, weight: null, style: "folkstyle" },
+          { event: "Tar Heel State Classic", year: 2026, detail: "Champion", date: null, weight: null, style: "freestyle" },
+        ],
+      }),
+    )
+    expect(html.indexOf("Tar Heel State Classic")).toBeGreaterThan(html.indexOf("OLYMPIC STYLES"))
+    expect(html.indexOf("NCHSAA State Championships")).toBeLessThan(html.indexOf("OLYMPIC STYLES"))
   })
 
   it("prints the recipient watermark on a full-tier copy", () => {
