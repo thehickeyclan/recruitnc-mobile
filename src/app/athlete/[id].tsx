@@ -8,6 +8,7 @@ import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons"
 import { colors, radius, space, type } from "@/theme/tokens"
 import { openAthleteProfile, openWebPage } from "@/lib/profile-link"
 import { claimAthleteProfile, currentUserId, loadAthleteEdits } from "@/lib/athlete-edit"
+import { fetchFollowState, setFollowing } from "@/lib/follows"
 import { fetchScoutingAccess } from "@/lib/scouting-report"
 import {
   STYLE_LABEL,
@@ -228,6 +229,49 @@ export default function AthleteProfileScreen() {
     }
   }, [id])
 
+  /*
+   * Following: who gets told when this wrestler's next results land.
+   *
+   * Separate from claiming. A parent claims their own child; a coach follows other people's, and
+   * the button is the whole subscription - no settings screen to find. The tap flips the button
+   * first and saves after, because a recruiter tapping down a list should not wait on a network
+   * round trip, and a failure puts it back.
+   */
+  const [following, setFollowingState] = useState(false)
+  const [followBusy, setFollowBusy] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    void fetchFollowState(String(id)).then((is) => !cancelled && setFollowingState(is))
+    return () => {
+      cancelled = true
+    }
+  }, [id])
+
+  const toggleFollow = () => {
+    if (standing === "signed-out") {
+      Alert.alert(
+        "Sign in to follow",
+        "Following a wrestler sends you an alert when their results come in. A free account is all it takes.",
+        [
+          { text: "Not now", style: "cancel" },
+          { text: "Sign in", onPress: () => router.push("/sign-in") },
+        ],
+      )
+      return
+    }
+    const next = !following
+    setFollowingState(next)
+    setFollowBusy(true)
+    void setFollowing(String(id), next)
+      .then((saved) => setFollowingState(saved))
+      .catch((e: unknown) => {
+        setFollowingState(!next)
+        Alert.alert("Could not save that", e instanceof Error ? e.message : "Try again.")
+      })
+      .finally(() => setFollowBusy(false))
+  }
+
   const claim = (as: "self" | "parent") => {
     setClaiming(true)
     void claimAthleteProfile(String(id), as)
@@ -375,6 +419,23 @@ export default function AthleteProfileScreen() {
                   ) : null}
                 </View>
               </View>
+
+              {standing === "mine" ? null : (
+                <Pressable
+                  style={[styles.followButton, following && styles.followButtonOn]}
+                  onPress={toggleFollow}
+                  disabled={followBusy}
+                >
+                  <Ionicons
+                    name={following ? "notifications" : "notifications-outline"}
+                    size={16}
+                    color={following ? colors.ink : colors.text}
+                  />
+                  <Text style={[styles.followText, following && styles.followTextOn]}>
+                    {following ? "FOLLOWING" : "FOLLOW FOR RESULT ALERTS"}
+                  </Text>
+                </Pressable>
+              )}
 
               {scoutingReport ? (
                 <Pressable
@@ -774,6 +835,25 @@ const styles = StyleSheet.create({
     paddingVertical: space.md,
   },
   ownerActionText: { ...type.label, color: colors.ink, fontWeight: "800" },
+
+  /*
+   * Outlined when not following, filled gold once you are — the same gold as the other primary
+   * action, so the "on" state reads as a thing you did rather than a thing on offer.
+   */
+  followButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: space.sm,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radius.md,
+    paddingVertical: space.md,
+    marginBottom: space.md,
+  },
+  followButtonOn: { backgroundColor: colors.gold, borderColor: colors.gold },
+  followText: { ...type.label, color: colors.text, fontWeight: "800" },
+  followTextOn: { color: colors.ink },
 
   claimCard: {
     backgroundColor: colors.raised,

@@ -35,6 +35,13 @@ const ALERTS: { key: keyof AlertPrefs; title: string; detail: string }[] = [
     title: "College interest",
     detail: "NC United Blue: when a college program views your wrestler's profile. Sign in and link your wrestler to get these.",
   },
+  {
+    key: "results",
+    title: "Results for wrestlers you follow",
+    // One per event, not one per result: an import is fifty rows in a minute, and the point of
+    // the digest is that following ten wrestlers still means a single notification.
+    detail: "One alert per event — \u201CJourneymen results are in\u201D — naming who you follow that competed",
+  },
 ]
 
 export default function MoreScreen() {
@@ -141,6 +148,14 @@ export default function MoreScreen() {
               <View style={styles.rowBody}>
                 <Text style={styles.rowTitle}>My wrestlers</Text>
                 <Text style={styles.rowDetail}>Link your wrestler for college-interest alerts and profile editing</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            </Pressable>
+            {/* Where a result digest lands when tapped, and the only place to unfollow in bulk. */}
+            <Pressable style={[styles.row, styles.rowDivider]} onPress={() => router.push("/following" as never)}>
+              <View style={styles.rowBody}>
+                <Text style={styles.rowTitle}>Following</Text>
+                <Text style={styles.rowDetail}>Wrestlers you get result alerts for</Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
             </Pressable>

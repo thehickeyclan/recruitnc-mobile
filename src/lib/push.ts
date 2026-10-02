@@ -17,6 +17,8 @@ export type AlertPrefs = {
   college: boolean
   /** "A college program viewed your wrestler's profile" - needs a signed-in, linked account. */
   programViews: boolean
+  /** "Journeymen results are in" - one digest per event, for wrestlers this account follows. */
+  results: boolean
 }
 
 /**
@@ -40,6 +42,9 @@ export const DEFAULT_PREFS: AlertPrefs = {
   college: true,
   // On: it only ever fires for this family's own wrestler, and it is the alert parents want most.
   programViews: true,
+  // On, and self-limiting: it fires once per event, and only for wrestlers somebody chose to
+  // follow. A device following nobody never hears it.
+  results: true,
 }
 
 /** Merge older saved shapes over today's defaults so upgrades do not disable new alerts. */
