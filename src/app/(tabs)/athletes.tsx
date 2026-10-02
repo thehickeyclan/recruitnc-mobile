@@ -26,6 +26,8 @@ type Athlete = {
   club: string | null
   weightClass: string | null
   claimed: boolean
+  /** The server says whether this viewer may open this wrestler's report. */
+  scoutingReport?: boolean
 }
 
 const CREDS = [
@@ -143,6 +145,21 @@ export default function AthletesScreen() {
               </Text>
             </View>
             {!a.claimed && <Text style={styles.unclaimed}>Unclaimed</Text>}
+            {/*
+              * A coach opens the report from the list, without visiting the profile first.
+              * `scoutingReport` is decided per athlete on the server - the role rules and the
+              * availability test both - so this never offers a report the endpoint refuses.
+              */}
+            {a.scoutingReport ? (
+              <Pressable
+                hitSlop={8}
+                style={styles.reportButton}
+                accessibilityLabel={`Scouting report for ${a.name}`}
+                onPress={() => router.push({ pathname: "/scouting-report/[id]", params: { id: a.id } })}
+              >
+                <Ionicons name="document-text" size={18} color={colors.gold} />
+              </Pressable>
+            ) : null}
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </Pressable>
         ))}
@@ -191,6 +208,7 @@ const styles = StyleSheet.create({
   cardName: { ...type.body, fontWeight: "700", color: colors.text },
   cardDetail: { ...type.caption, color: colors.textMuted, marginTop: 2 },
   unclaimed: { ...type.caption, color: colors.gold },
+  reportButton: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
   error: { color: "#fca5a5", textAlign: "center", marginTop: space.lg },
   empty: { color: colors.textMuted, textAlign: "center", marginTop: space.lg },
 })
