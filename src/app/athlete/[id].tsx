@@ -4,16 +4,24 @@ import { SafeAreaView } from "react-native-safe-area-context"
 import { Image } from "expo-image"
 import { router, useLocalSearchParams } from "expo-router"
 import Ionicons from "@expo/vector-icons/Ionicons"
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons"
 import { colors, radius, space, type } from "@/theme/tokens"
 import { openAthleteProfile } from "@/lib/profile-link"
 import { claimAthleteProfile, currentUserId, loadAthleteEdits } from "@/lib/athlete-edit"
 import { fetchScoutingAccess } from "@/lib/scouting-report"
 import {
+  STYLE_LABEL,
   fetchAthleteProfile,
+  hasV2,
   profileMetaLine,
   rowSummary,
+  splitDuals,
+  splitName,
   weightLines,
   type AthleteProfile,
+  type BannerCredential,
+  type Competition,
+  type ProfileTournamentBout,
   type ProfileTournamentRow,
 } from "@/lib/athlete-profile"
 
@@ -59,21 +67,111 @@ function TournamentRow({ row }: { row: ProfileTournamentRow }) {
         ) : null}
       </Pressable>
 
-      {open
-        ? bouts.map((bout, index) => (
-            <View key={`${row.id}-${index}`} style={styles.bout}>
-              {/* Some imports carry no round label; an empty column just eats the opponent's name. */}
-              {bout.round ? <Text style={styles.boutRound}>{bout.round}</Text> : null}
-              <Text style={styles.boutOpponent} numberOfLines={1}>
-                {bout.isBye ? "Bye" : (bout.opponentName ?? "Opponent")}
-              </Text>
-              <Text style={[styles.boutResult, bout.win ? styles.boutWin : styles.boutLoss]}>
-                {bout.isBye ? "—" : `${bout.win ? "W" : "L"} ${[bout.winType, bout.score].filter(Boolean).join(" ")}`}
-              </Text>
-            </View>
-          ))
-        : null}
+      {open ? (
+        <View style={styles.bouts}>
+          {bouts.map((bout, index) => (
+            <BoutCard key={`${row.id}-${index}`} bout={bout} />
+          ))}
+        </View>
+      ) : null}
     </View>
+  )
+}
+
+/** One bout: round and result on top, the opponent below, and his accolade under that. */
+function BoutCard({ bout }: { bout: ProfileTournamentBout }) {
+  const accolade = bout.accolade ?? null
+  return (
+    <View style={styles.boutCard}>
+      <View style={styles.boutTop}>
+        {/* Some imports carry no round label. */}
+        <Text style={styles.boutRound} numberOfLines={1}>
+          {bout.round ?? ""}
+        </Text>
+        {bout.isBye ? (
+          <Text style={styles.boutBye}>Bye</Text>
+        ) : (
+          <View style={styles.boutResultRow}>
+            <View style={[styles.wl, bout.win ? styles.wlWin : styles.wlLoss]}>
+              <Text style={styles.wlText}>{bout.win ? "W" : "L"}</Text>
+            </View>
+            <Text style={styles.boutScore}>{[bout.winType, bout.score].filter(Boolean).join(" ")}</Text>
+          </View>
+        )}
+      </View>
+      {!bout.isBye ? (
+        <Text style={styles.boutOpponent}>
+          {bout.opponentName ?? "Opponent"}
+          {bout.opponentClub ? <Text style={styles.boutClub}>  {bout.opponentClub}</Text> : null}
+        </Text>
+      ) : null}
+      {accolade ? (
+        <View style={[styles.accolade, /champion/i.test(accolade) && styles.accoladeGold]}>
+          <Text style={[styles.accoladeText, /champion/i.test(accolade) && styles.accoladeTextGold]}>{accolade}</Text>
+        </View>
+      ) : null}
+    </View>
+  )
+}
+
+const CREDENTIAL_ICON: Record<BannerCredential["tier"], React.ComponentProps<typeof MaterialCommunityIcons>["name"]> = {
+  national: "trophy-outline",
+  toc: "crown-outline",
+  state: "medal-outline",
+  "olympic-state": "star-circle-outline",
+}
+
+/** The banner's finishes: a bordered card each, two to a row (Matt's mock, 1 Oct 2026). */
+function CredentialCards({ credentials }: { credentials: BannerCredential[] }) {
+  if (!credentials.length) return null
+  return (
+    <View style={styles.cards}>
+      {credentials.map((c) => (
+        <View key={c.label} style={styles.card}>
+          <MaterialCommunityIcons name={CREDENTIAL_ICON[c.tier]} size={20} color={colors.gold} />
+          <View style={styles.flex}>
+            <Text style={[styles.cardTitle, c.tier === "national" && styles.cardTitleGold]}>{c.title.toUpperCase()}</Text>
+            <Text style={styles.cardDetail}>{c.detail.toUpperCase()}</Text>
+          </View>
+        </View>
+      ))}
+    </View>
+  )
+}
+
+function CompetesBar({ competition }: { competition: Competition }) {
+  return (
+    <View style={styles.competes}>
+      <Text style={styles.competesLine}>
+        <Text style={styles.competesLabel}>COMPETES  </Text>
+        <Text style={styles.competesScope}>{competition.scope === "national" ? "NATIONALLY" : "NORTH CAROLINA ONLY"}</Text>
+        {competition.styles.map((st) => (
+          <Text key={st} style={styles.competesStyle}>
+            {"  ·  "}
+            {STYLE_LABEL[st].toUpperCase()}
+          </Text>
+        ))}
+      </Text>
+      {competition.scope === "national" && competition.nationalEvents.length ? (
+        <Text style={styles.competesEvents}>{competition.nationalEvents.join(", ")}</Text>
+      ) : null}
+    </View>
+  )
+}
+
+/** Rows with duals after the individual events, under their own small label. */
+function RowList({ rows, dualsLabel }: { rows: ProfileTournamentRow[]; dualsLabel: string }) {
+  const { individual, duals } = splitDuals(rows)
+  return (
+    <>
+      {individual.map((row) => (
+        <TournamentRow key={row.id} row={row} />
+      ))}
+      {duals.length ? <Text style={styles.subLabel}>{dualsLabel}</Text> : null}
+      {duals.map((row) => (
+        <TournamentRow key={row.id} row={row} />
+      ))}
+    </>
   )
 }
 
@@ -198,6 +296,186 @@ export default function AthleteProfileScreen() {
             />
           }
         >
+          {hasV2(athlete) ? (
+            <>
+              {/* Banner, as on the website (Matt's mock, 1 Oct 2026): photo, eyebrow, the name in
+                  two weights, the gold ribbon, the stat row, a card per key finish, Competes. */}
+              <View style={styles.bannerPhotoWrap}>
+                {athlete.photoUrl ? (
+                  <Image
+                    source={{ uri: athlete.photoUrl }}
+                    style={styles.bannerPhoto}
+                    contentFit="cover"
+                    contentPosition="top"
+                    transition={180}
+                  />
+                ) : (
+                  <View style={[styles.bannerPhoto, styles.photoEmpty]}>
+                    <Text style={styles.initials}>{initials(athlete.name || String(name ?? ""))}</Text>
+                  </View>
+                )}
+                {/* A fade into the page without a gradient module (a native change): stacked bands. */}
+                <View pointerEvents="none" style={styles.fade}>
+                  {Array.from({ length: 16 }, (_, i) => ((i + 1) / 16) ** 1.6).map((o) => (
+                    <View key={o} style={[styles.fadeBand, { opacity: o }]} />
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.identity}>
+                <Text style={styles.eyebrow}>NORTH CAROLINA WRESTLING</Text>
+                {(() => {
+                  const { first, last } = splitName(athlete.name || String(name ?? ""))
+                  return (
+                    <View>
+                      {first ? (
+                        <Text style={styles.firstName} maxFontSizeMultiplier={1.2}>
+                          {first.toUpperCase()}
+                        </Text>
+                      ) : null}
+                      <Text style={styles.lastName} maxFontSizeMultiplier={1.2}>
+                        {last.toUpperCase()}
+                      </Text>
+                    </View>
+                  )
+                })()}
+                {athlete.prospectRanking || athlete.graduationYear ? (
+                  <View style={styles.ribbon}>
+                    <Text style={styles.ribbonText}>
+                      {[
+                        athlete.prospectRanking ? `RECRUITNC #${athlete.prospectRanking}` : null,
+                        athlete.graduationYear ? `CLASS OF ${athlete.graduationYear}` : null,
+                      ]
+                        .filter(Boolean)
+                        .join("  ·  ")}
+                    </Text>
+                  </View>
+                ) : null}
+                {[athlete.highSchool, athlete.club].filter(Boolean).length ? (
+                  <Text style={styles.meta}>{[athlete.highSchool, athlete.club].filter(Boolean).join(" · ")}</Text>
+                ) : null}
+
+                <View style={styles.stats}>
+                  <View style={styles.stat}>
+                    <Text style={styles.statLabel}>YEAR</Text>
+                    <Text style={styles.statValue}>{athlete.graduationYear ?? "—"}</Text>
+                  </View>
+                  <View style={[styles.stat, styles.statDivided]}>
+                    <Text style={styles.statLabel}>WEIGHT</Text>
+                    <Text style={styles.statValue}>{athlete.weight.display ? `${athlete.weight.display} lbs` : "—"}</Text>
+                  </View>
+                  {athlete.weight.lastCompeted?.weight ? (
+                    <View style={[styles.stat, styles.statDivided, styles.flex]}>
+                      <Text style={styles.statLabel}>LAST COMPETED</Text>
+                      <Text style={styles.statValueSmall}>{athlete.weight.lastCompeted.weight} lbs</Text>
+                      <Text style={styles.statSub} numberOfLines={2}>
+                        {[athlete.weight.lastCompeted.event, athlete.weight.lastCompeted.year].filter(Boolean).join(" ")}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              </View>
+
+              {scoutingReport ? (
+                <Pressable
+                  style={styles.ownerAction}
+                  onPress={() => router.push({ pathname: "/scouting-report/[id]", params: { id: String(id) } })}
+                >
+                  <Ionicons name="document-text" size={16} color={colors.ink} />
+                  <Text style={styles.ownerActionText}>VIEW SCOUTING REPORT</Text>
+                </Pressable>
+              ) : null}
+
+              {standing === "mine" ? (
+                // Matt: if someone owns the profile, make it obvious they can edit it.
+                <View style={styles.ownerBar}>
+                  <View style={styles.flex}>
+                    <Text style={styles.ownerTitle}>This is your profile</Text>
+                    <Text style={styles.ownerBody}>College coaches read this page. Keep your weight, film and GPA current.</Text>
+                  </View>
+                  <Pressable
+                    style={styles.ownerEdit}
+                    onPress={() => router.push({ pathname: "/athlete-edit", params: { id: String(id), name: athlete.name } })}
+                  >
+                    <Ionicons name="create" size={16} color={colors.ink} />
+                    <Text style={styles.ownerActionText}>Edit</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+
+              {athlete.commitment ? (
+                <View style={styles.commit}>
+                  <Ionicons name="school" size={18} color={colors.gold} />
+                  <View style={styles.flex}>
+                    <Text style={styles.commitCollege}>{athlete.commitment.college}</Text>
+                    <Text style={styles.commitStatus}>{athlete.commitment.status ?? "Committed"}</Text>
+                  </View>
+                </View>
+              ) : null}
+
+              <CredentialCards credentials={athlete.banner!.credentials} />
+              <CompetesBar competition={athlete.banner!.competition} />
+
+              {/* In-state first - the Tournament of Champions, then NCHSAA States - then national
+                  folkstyle, and Freestyle & Greco-Roman last, as on the website. */}
+              {athlete.tocRows?.length ? (
+                <Section title="TOURNAMENT OF CHAMPIONS">
+                  {athlete.tocRows.map((row) => (
+                    <TournamentRow key={row.id} row={row} />
+                  ))}
+                </Section>
+              ) : null}
+              {athlete.stateRows?.length ? (
+                <Section title="NCHSAA STATE CHAMPIONSHIPS">
+                  {athlete.stateRows.map((row) => (
+                    <TournamentRow key={row.id} row={row} />
+                  ))}
+                </Section>
+              ) : null}
+              {athlete.folkstyle?.length ? (
+                <Section title="NATIONAL TOURNAMENTS — FOLKSTYLE">
+                  <RowList rows={athlete.folkstyle} dualsLabel="DUALS & TEAM EVENTS" />
+                </Section>
+              ) : null}
+              {athlete.olympic?.length ? (
+                <>
+                  <View style={styles.styleDivider}>
+                    <Text style={styles.styleDividerTitle}>OLYMPIC STYLES</Text>
+                    <Text style={styles.styleDividerNote}>Freestyle & Greco-Roman — not folkstyle</Text>
+                  </View>
+                  <Section title="FREESTYLE & GRECO-ROMAN">
+                    <RowList rows={athlete.olympic} dualsLabel="DUAL RESULTS" />
+                  </Section>
+                </>
+              ) : null}
+
+              {(standing === "other" || standing === "signed-out") && !scoutingReport ? (
+                <View style={styles.claimCard}>
+                  <Text style={styles.claimTitle}>Is this you?</Text>
+                  <Text style={styles.claimBody}>
+                    {standing === "signed-out"
+                      ? "Sign in to claim this profile and add your GPA, film and projected college weight."
+                      : "Claim it to add your GPA, film and projected college weight — the things college coaches look for first."}
+                  </Text>
+                  {standing === "signed-out" ? (
+                    <Pressable style={styles.claimButton} onPress={() => router.push("/sign-in")}>
+                      <Text style={styles.claimButtonText}>Sign in</Text>
+                    </Pressable>
+                  ) : (
+                    <View style={styles.claimRow}>
+                      <Pressable style={styles.claimButton} disabled={claiming} onPress={() => claim("self")}>
+                        <Text style={styles.claimButtonText}>{claiming ? "…" : "This is me"}</Text>
+                      </Pressable>
+                      <Pressable style={styles.claimSecondary} disabled={claiming} onPress={() => claim("parent")}>
+                        <Text style={styles.claimSecondaryText}>I'm a parent</Text>
+                      </Pressable>
+                    </View>
+                  )}
+                </View>
+              ) : null}
+            </>
+          ) : (
+            <>
           <View style={styles.hero}>
             {athlete.photoUrl ? (
               <Image
@@ -337,6 +615,9 @@ export default function AthleteProfileScreen() {
             </Section>
           ) : null}
 
+            </>
+          )}
+
           {/* The match log, highlights, academics and the coaches' scouting report still live on
               the website. It opens signed in as this account — see lib/profile-link. */}
           <Pressable style={styles.webLink} onPress={() => openAthleteProfile(athlete.id)}>
@@ -369,6 +650,99 @@ const styles = StyleSheet.create({
   backText: { ...type.label, color: colors.gold },
 
   hero: { flexDirection: "row", alignItems: "center", gap: space.md },
+  bannerPhotoWrap: { marginHorizontal: -space.lg, marginTop: -space.lg, height: 380, backgroundColor: colors.surface },
+  bannerPhoto: { width: "100%", height: 380 },
+  fade: { position: "absolute", left: 0, right: 0, bottom: 0, height: 120 },
+  fadeBand: { flex: 1, backgroundColor: colors.ink },
+  identity: { gap: space.sm, marginTop: -space.md },
+  eyebrow: { fontSize: 10, fontWeight: "700", letterSpacing: 4, color: colors.gold },
+  firstName: { fontSize: 32, fontWeight: "600", color: colors.text, opacity: 0.92, letterSpacing: -0.5, lineHeight: 34 },
+  lastName: { fontSize: 44, fontWeight: "900", color: colors.text, letterSpacing: -1, lineHeight: 46 },
+  ribbon: {
+    alignSelf: "flex-start",
+    backgroundColor: colors.gold,
+    borderRadius: 6,
+    paddingHorizontal: space.md,
+    paddingVertical: 6,
+    marginTop: space.xs,
+  },
+  ribbonText: { fontSize: 11, fontWeight: "900", letterSpacing: 2.5, color: colors.ink },
+  stats: { flexDirection: "row", marginTop: space.sm },
+  stat: { paddingRight: space.md },
+  statDivided: { borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: colors.textMuted, paddingLeft: space.md },
+  statLabel: { fontSize: 9, fontWeight: "700", letterSpacing: 1.6, color: colors.textMuted },
+  statValue: { fontSize: 22, fontWeight: "900", color: colors.text, marginTop: 4 },
+  statValueSmall: { fontSize: 18, fontWeight: "800", color: colors.text, marginTop: 4 },
+  statSub: { fontSize: 11, color: colors.textSecondary, marginTop: 2 },
+  cards: { flexDirection: "row", flexWrap: "wrap", gap: space.sm },
+  card: {
+    width: "48.5%",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.sm,
+    borderWidth: 1,
+    borderColor: "rgba(211,181,116,0.5)",
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    paddingHorizontal: space.md,
+    paddingVertical: space.md,
+  },
+  cardTitle: { fontSize: 12, fontWeight: "800", letterSpacing: 0.8, color: colors.text },
+  cardTitleGold: { color: colors.gold },
+  cardDetail: { fontSize: 11, fontWeight: "700", letterSpacing: 0.5, color: colors.textSecondary, marginTop: 3 },
+  competes: {
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    padding: space.md,
+    gap: space.sm,
+  },
+  competesLine: { lineHeight: 20 },
+  competesLabel: { fontSize: 10, fontWeight: "700", letterSpacing: 2.5, color: colors.textMuted },
+  competesScope: { fontSize: 13, fontWeight: "900", letterSpacing: 1.2, color: colors.text },
+  competesStyle: { fontSize: 13, fontWeight: "900", letterSpacing: 1.2, color: colors.gold },
+  competesEvents: { fontSize: 12, color: colors.textMuted, lineHeight: 17 },
+  ownerBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.md,
+    borderWidth: 1,
+    borderColor: colors.gold,
+    borderRadius: radius.md,
+    backgroundColor: "rgba(211,181,116,0.1)",
+    padding: space.md,
+  },
+  ownerTitle: { ...type.heading, color: colors.text },
+  ownerBody: { ...type.label, color: colors.textSecondary, fontWeight: "500", marginTop: 2 },
+  ownerEdit: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: colors.gold,
+    borderRadius: radius.sm,
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm,
+  },
+  styleDivider: { backgroundColor: colors.raised, borderRadius: radius.sm, paddingHorizontal: space.md, paddingVertical: space.sm, marginTop: space.md },
+  styleDividerTitle: { fontSize: 12, fontWeight: "900", letterSpacing: 2.5, color: colors.text },
+  styleDividerNote: { fontSize: 11, color: colors.textSecondary, marginTop: 2 },
+  subLabel: { fontSize: 10, fontWeight: "800", letterSpacing: 1.6, color: colors.textMuted, paddingHorizontal: space.md, paddingTop: space.md, paddingBottom: space.xs },
+  bouts: { backgroundColor: colors.ink, padding: space.sm, gap: space.sm },
+  boutCard: { borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, backgroundColor: colors.surface, padding: space.sm, gap: 4 },
+  boutTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: space.sm },
+  boutResultRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  wl: { borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 },
+  wlWin: { backgroundColor: "#059669" },
+  wlLoss: { backgroundColor: "#B91C1C" },
+  wlText: { fontSize: 11, fontWeight: "900", color: colors.text },
+  boutScore: { fontSize: 12, fontWeight: "600", color: colors.textSecondary, fontVariant: ["tabular-nums"] },
+  boutBye: { fontSize: 12, color: colors.textMuted },
+  boutClub: { fontSize: 12, fontWeight: "500", color: colors.textMuted },
+  accolade: { alignSelf: "flex-start", borderWidth: 1, borderColor: colors.line, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2, marginTop: 2 },
+  accoladeGold: { borderColor: "rgba(211,181,116,0.4)", backgroundColor: "rgba(211,181,116,0.15)" },
+  accoladeText: { fontSize: 10, fontWeight: "800", letterSpacing: 0.5, color: colors.textSecondary },
+  accoladeTextGold: { color: colors.gold },
   photo: { width: 84, height: 84, borderRadius: radius.md, backgroundColor: colors.surface },
   photoEmpty: { alignItems: "center", justifyContent: "center" },
   initials: { ...type.title, color: colors.gold },
@@ -490,8 +864,8 @@ const styles = StyleSheet.create({
     paddingVertical: space.sm,
     backgroundColor: colors.ink,
   },
-  boutRound: { ...type.caption, color: colors.textMuted, width: 86 },
-  boutOpponent: { ...type.label, color: colors.text, flex: 1 },
+  boutRound: { ...type.caption, color: colors.textMuted, flex: 1 },
+  boutOpponent: { ...type.label, color: colors.text, fontWeight: "700" },
   boutResult: { ...type.caption },
   boutWin: { color: colors.success },
   boutLoss: { color: colors.textMuted },

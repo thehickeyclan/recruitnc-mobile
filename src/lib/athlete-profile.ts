@@ -23,6 +23,8 @@ export type ProfileTournamentBout = {
   isBye: boolean | null
   winType: string | null
   score: string | null
+  /** v2: the opponent's accolade ("2026 FL 1A State Champion"), same rules as the website. */
+  accolade?: string | null
 }
 
 export type ProfileTournamentRow = {
@@ -56,6 +58,51 @@ export type AthleteProfile = {
   stateResults: { year: number; place: number | null; classification: string | null; weightClass: string | null }[]
   toc: ProfileTournamentRow[]
   national: ProfileTournamentRow[]
+  /**
+   * v2 (1 Oct 2026, the redesigned profile). Absent from an older server, in which case the
+   * screen falls back to the v1 sections - see hasV2.
+   */
+  banner?: { credentials: BannerCredential[]; competition: Competition }
+  stateRows?: ProfileTournamentRow[]
+  tocRows?: ProfileTournamentRow[]
+  folkstyle?: ProfileTournamentRow[]
+  olympic?: ProfileTournamentRow[]
+}
+
+export type BannerCredential = {
+  title: string
+  detail: string
+  label: string
+  tier: "national" | "toc" | "state" | "olympic-state"
+}
+
+export type Competition = {
+  scope: "national" | "in-state"
+  nationalEvents: string[]
+  styles: Array<"folkstyle" | "freestyle" | "greco">
+}
+
+export const STYLE_LABEL: Record<Competition["styles"][number], string> = {
+  folkstyle: "Folkstyle",
+  freestyle: "Freestyle",
+  greco: "Greco-Roman",
+}
+
+/** Whether the server sent the redesigned profile's sections. */
+export function hasV2(athlete: AthleteProfile): boolean {
+  return Boolean(athlete.banner && athlete.folkstyle && athlete.olympic)
+}
+
+/** "Aaron" over "ELLISON"; a suffix stays with the surname ("Smith Jr."). */
+export function splitName(name: string): { first: string; last: string } {
+  const words = name.trim().split(/\s+/)
+  const suffix = words.length > 2 && /^(jr\.?|sr\.?|ii|iii|iv)$/i.test(words[words.length - 1]) ? 2 : 1
+  return { first: words.slice(0, -suffix).join(" "), last: words.slice(-suffix).join(" ") }
+}
+
+/** Duals rows have a team and no placement; they print after the individual events. */
+export function splitDuals(rows: ProfileTournamentRow[]): { individual: ProfileTournamentRow[]; duals: ProfileTournamentRow[] } {
+  return { individual: rows.filter((r) => !r.isDuals), duals: rows.filter((r) => r.isDuals) }
 }
 
 export async function fetchAthleteProfile(athleteId: string, signal?: AbortSignal): Promise<AthleteProfile> {
