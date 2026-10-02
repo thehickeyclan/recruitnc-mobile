@@ -123,8 +123,9 @@ function Field({
 }
 
 export default function SignInScreen() {
-  const { reason } = useLocalSearchParams<{ reason?: string }>()
-  const [mode, setMode] = useState<Mode>("signin")
+  /* ?mode=signup so a claim card can send somebody straight to making an account. */
+  const { reason, mode: modeParam } = useLocalSearchParams<{ reason?: string; mode?: string }>()
+  const [mode, setMode] = useState<Mode>(modeParam === "signup" ? "signup" : "signin")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [firstName, setFirstName] = useState("")

@@ -6,7 +6,7 @@ import { router, useLocalSearchParams } from "expo-router"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons"
 import { colors, radius, space, type } from "@/theme/tokens"
-import { openAthleteProfile } from "@/lib/profile-link"
+import { openAthleteProfile, openWebPage } from "@/lib/profile-link"
 import { claimAthleteProfile, currentUserId, loadAthleteEdits } from "@/lib/athlete-edit"
 import { fetchScoutingAccess } from "@/lib/scouting-report"
 import {
@@ -233,12 +233,12 @@ export default function AthleteProfileScreen() {
     void claimAthleteProfile(String(id), as)
       .then(async () => {
         await checkStanding()
-        Alert.alert(
-          as === "self" ? "Profile claimed" : "Athlete linked",
-          as === "self"
-            ? "It is yours now — add your GPA, film and projected college weight."
-            : "You can edit this profile from here.",
-        )
+        /*
+         * Into the same form the website uses. A claim used to end on an alert, so a family
+         * arrived at a page built from results and left it exactly as they found it - and the
+         * app had no way to fill in a GPA at all.
+         */
+        openWebPage(`/profile-setup?id=${encodeURIComponent(String(id))}`)
       })
       .catch((e: unknown) => Alert.alert("Could not claim", e instanceof Error ? e.message : "Try again."))
       .finally(() => setClaiming(false))
@@ -454,7 +454,7 @@ export default function AthleteProfileScreen() {
                   <Text style={styles.claimTitle}>Is this you?</Text>
                   <Text style={styles.claimBody}>
                     {standing === "signed-out"
-                      ? "Sign in to claim this profile and add your GPA, film and projected college weight."
+                      ? "A free account lets you claim this profile and add your GPA, film and projected college weight."
                       : "Claim it to add your GPA, film and projected college weight — the things college coaches look for first."}
                   </Text>
                   {standing === "signed-out" ? (
@@ -531,13 +531,19 @@ export default function AthleteProfileScreen() {
               <Text style={styles.claimTitle}>Is this you?</Text>
               <Text style={styles.claimBody}>
                 {standing === "signed-out"
-                  ? "Sign in to claim this profile and add your GPA, film and projected college weight."
+                  ? "A free account lets you claim this profile and add your GPA, film and projected college weight."
                   : "Claim it to add your GPA, film and projected college weight — the things college coaches look for first."}
               </Text>
               {standing === "signed-out" ? (
-                <Pressable style={styles.claimButton} onPress={() => router.push("/sign-in")}>
-                  <Text style={styles.claimButtonText}>Sign in</Text>
-                </Pressable>
+                /* Most people here have no account - they are looking at a page we built for them. */
+                <View style={styles.claimRow}>
+                  <Pressable style={styles.claimButton} onPress={() => router.push("/sign-in?mode=signup")}>
+                    <Text style={styles.claimButtonText}>Create a free account</Text>
+                  </Pressable>
+                  <Pressable style={styles.claimSecondary} onPress={() => router.push("/sign-in")}>
+                    <Text style={styles.claimSecondaryText}>I have one</Text>
+                  </Pressable>
+                </View>
               ) : (
                 <View style={styles.claimRow}>
                   <Pressable style={styles.claimButton} disabled={claiming} onPress={() => claim("self")}>
