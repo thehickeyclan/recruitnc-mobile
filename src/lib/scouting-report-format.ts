@@ -243,11 +243,18 @@ export function statusLine(report: Pick<ScoutingReport, "commitment" | "recruiti
  * ("NC Freestyle & Greco State Championships - 16U Boys Freestyle" is freestyle), Fargo with no
  * style named is freestyle, everything else is folkstyle.
  */
+/** Events that are freestyle/Greco only, whatever their names say (Matt: "Tar Heel Classic is freestyle"). */
+const OLYMPIC_ONLY_EVENTS =
+  /tar\s*heel state classic|u\.?\s?s\.? open|frank e\.? rader|southeast regional championships|national duals - (16u|junior)|(16u|junior) national duals|usaw|usa wrestling/i
+
 export function styleOfEvent(...parts: Array<string | null | undefined>): WrestlingStyle {
   const divisions = parts.filter(Boolean).map(String).filter((p) => p.includes(" - ")).map((p) => p.split(" - ").pop()!)
   const text = (divisions.length ? divisions : parts.filter(Boolean)).join(" ").toLowerCase()
   if (/\bgreco\b/.test(text)) return "greco"
   if (/\bfreestyle\b|\bfargo\b/.test(text)) return "freestyle"
+  // USA Wrestling events whose names never say the style - a family-submitted win "at the Tar Heel
+  // State Classic" was filed under folkstyle (Matt, Hayden Smith). Freestyle unless Greco is named.
+  if (OLYMPIC_ONLY_EVENTS.test(parts.filter(Boolean).join(" "))) return "freestyle"
   return "folkstyle"
 }
 
