@@ -57,6 +57,8 @@ export default function AthletesScreen() {
       if (q.trim().length >= 2) params.set("q", q.trim())
       if (gender) params.set("gender", gender)
       if (gradYear) params.set("gradYear", String(gradYear))
+      // Browsing shows current classes only; a name search still reaches graduates.
+      else if (q.trim().length < 2) params.set("minYear", String(CLASSES[0]))
       if (creds.length) params.set("cred", creds.join(","))
       const base = process.env.EXPO_PUBLIC_WEB_BASE_URL ?? ""
       const res = await fetch(`${base}${API}?${params.toString()}`)
@@ -182,8 +184,10 @@ const styles = StyleSheet.create({
     height: 44,
   },
   search: { flex: 1, color: colors.text, fontSize: 16 },
-  filterRow: { flexGrow: 0, maxHeight: 48 },
-  filterRowInner: { paddingHorizontal: space.md, paddingVertical: space.xs, gap: space.xs },
+  // flexShrink 0: the list below takes the remaining height, and a shrinkable row was squeezed
+  // until the chips' text was cut in half.
+  filterRow: { flexGrow: 0, flexShrink: 0 },
+  filterRowInner: { paddingHorizontal: space.md, paddingVertical: space.xs, alignItems: "center" },
   chip: {
     paddingHorizontal: space.sm,
     paddingVertical: 7,
