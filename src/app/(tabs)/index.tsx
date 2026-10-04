@@ -10,6 +10,8 @@ import { fetchCommits, type Commit } from "@/lib/commits"
 import { fetchUpcomingEvents, formatTime, type CalendarEvent } from "@/lib/events"
 import { tocIsOver } from "@/lib/toc-live"
 import { TocMadnessCard } from "@/components/toc-madness-card"
+import { fetchLatestNews, type NewsItem } from "@/lib/news"
+import { openWebPage } from "@/lib/profile-link"
 
 /**
  * Home — what is happening right now, in the order it matters.
@@ -46,6 +48,25 @@ function SectionHeader({ title, action, onPress }: { title: string; action: stri
         <Text style={styles.sectionAction}>{action}</Text>
       </Pressable>
     </View>
+  )
+}
+
+/** The newest story, as the first thing on Home: image, category, headline. */
+function TopStory({ item }: { item: NewsItem }) {
+  const open = () => {
+    if (item.path) openWebPage(item.path)
+    else if (item.url) openWeb(item.url)
+  }
+  return (
+    <Pressable style={styles.story} onPress={open} accessibilityRole="link" accessibilityLabel={item.title}>
+      {item.image ? <Image source={{ uri: item.image }} style={styles.storyImage} resizeMode="cover" /> : null}
+      <View style={styles.storyBody}>
+        {item.category ? <Text style={styles.storyCategory}>{item.category}</Text> : null}
+        <Text style={styles.storyTitle}>{item.title}</Text>
+        <Text style={styles.storySummary} numberOfLines={3}>{item.summary}</Text>
+        <Text style={styles.storyAction}>Read the story ›</Text>
+      </View>
+    </Pressable>
   )
 }
 
@@ -95,6 +116,7 @@ export default function HomeScreen() {
   const [field, setField] = useState<TocField | null>(null)
   const [commits, setCommits] = useState<Commit[]>([])
   const [events, setEvents] = useState<CalendarEvent[]>([])
+  const [news, setNews] = useState<NewsItem[]>([])
 
   useEffect(() => {
     // Each section fills in on its own. One slow call should not hold up the rest of the page.
@@ -103,6 +125,7 @@ export default function HomeScreen() {
     if (!tocIsOver()) void fetchTocField().then(setField).catch(() => undefined)
     void fetchCommits(3).then((r) => setCommits(r.commits.slice(0, 3))).catch(() => undefined)
     void fetchUpcomingEvents().then((r) => setEvents(r.slice(0, 3))).catch(() => undefined)
+    void fetchLatestNews().then(setNews).catch(() => undefined)
   }, [])
 
   const announced = field?.tiles.filter((t) => t.announced).length ?? 0
@@ -122,6 +145,13 @@ export default function HomeScreen() {
             <Text style={styles.title}>North Carolina wrestling, all of it</Text>
           </View>
         </View>
+
+        {news[0] ? (
+          <View style={styles.storySection}>
+            <SectionHeader title="Latest news" action="All news" onPress={() => openWebPage("/news")} />
+            <TopStory item={news[0]} />
+          </View>
+        ) : null}
 
         <TocMadnessCard
           announced={announced}
@@ -206,6 +236,20 @@ const styles = StyleSheet.create({
   title: { ...type.title, color: colors.text, marginTop: 2 },
 
   section: { gap: space.sm },
+  storySection: { gap: space.sm },
+  story: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.gold,
+    borderRadius: radius.md,
+    overflow: "hidden",
+  },
+  storyImage: { width: "100%", aspectRatio: 4 / 3, backgroundColor: "#000" },
+  storyBody: { padding: space.md, gap: 6 },
+  storyCategory: { ...type.label, color: colors.gold, letterSpacing: 1.5 },
+  storyTitle: { ...type.heading, color: colors.text },
+  storySummary: { ...type.body, color: colors.textMuted },
+  storyAction: { ...type.label, color: colors.gold, marginTop: 4 },
   sectionHead: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" },
   sectionTitle: { ...type.heading, color: colors.text },
   sectionAction: { ...type.label, color: colors.gold },
