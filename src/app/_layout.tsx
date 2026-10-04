@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react"
 import { Stack, router, useRootNavigationState } from "expo-router"
 import * as Notifications from "expo-notifications"
 import { notificationPath } from "@/lib/notification-path"
+import { openWebPage } from "@/lib/profile-link"
 import { StatusBar } from "expo-status-bar"
 import * as SplashScreen from "expo-splash-screen"
 import { colors } from "@/theme/tokens"
@@ -33,7 +34,11 @@ function useNotificationTaps() {
     if (handled.current === id) return
     handled.current = id
     const path = notificationPath(response.notification.request.content.data)
-    if (path) router.push(path as never)
+    if (!path) return
+    // News lives on the website; the app has no screen of its own for an article, so a news
+    // alert routed in-app landed on "unmatched route". Open the article in the web sheet instead.
+    if (path === "/news" || path.startsWith("/news/")) openWebPage(path)
+    else router.push(path as never)
   }, [navigationReady, response])
 }
 
