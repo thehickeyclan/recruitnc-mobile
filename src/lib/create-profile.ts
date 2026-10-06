@@ -14,6 +14,8 @@ export type NewProfile = {
   highSchool: string
   weightClass: string
   club?: string
+  /** Ten digits; the server stores it formatted. */
+  phone: string
   /** Optional; the server range-checks and drops anything out of range. */
   academicGpa?: string
   academicSat?: string

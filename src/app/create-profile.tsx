@@ -29,7 +29,7 @@ import { createProfile, graduationYears, WEIGHTS, type CreateResult, type NewPro
  * If the site already holds this wrestler (by name, class and school), it asks before making a
  * second profile: most NC wrestlers already have one built from their results.
  */
-type Step = "who" | "signature" | "name" | "gender" | "year" | "school" | "weight" | "academics" | "study" | "club" | "saving" | "found" | "done"
+type Step = "who" | "signature" | "name" | "gender" | "year" | "school" | "weight" | "phone" | "academics" | "study" | "club" | "saving" | "found" | "done"
 
 /** Opened from a link there is nothing underneath to go back to; go home instead. */
 function close() {
@@ -48,6 +48,7 @@ export default function CreateProfileScreen() {
   const [year, setYear] = useState<number | null>(null)
   const [school, setSchool] = useState("")
   const [weight, setWeight] = useState<string | null>(null)
+  const [phone, setPhone] = useState("")
   const [gpa, setGpa] = useState("")
   const [sat, setSat] = useState("")
   const [act, setAct] = useState("")
@@ -65,7 +66,7 @@ export default function CreateProfileScreen() {
   )
 
   const flow: Step[] = useMemo(
-    () => ["who", ...(rel === "parent" ? (["signature"] as Step[]) : []), "name", "gender", "year", "school", "weight", "academics", "study", "club"],
+    () => ["who", ...(rel === "parent" ? (["signature"] as Step[]) : []), "name", "gender", "year", "school", "weight", "phone", "academics", "study", "club"],
     [rel],
   )
   const index = flow.indexOf(step)
@@ -88,6 +89,7 @@ export default function CreateProfileScreen() {
       highSchool: school.trim(),
       weightClass: weight!,
       club: club.trim() || undefined,
+      phone: phoneDigits(phone),
       academicGpa: gpa.trim() || undefined,
       academicSat: sat.trim() || undefined,
       academicAct: act.trim() || undefined,
@@ -114,9 +116,9 @@ export default function CreateProfileScreen() {
     setStep("saving")
     try {
       await claimAthleteProfile(found.athleteId, rel)
-      // The profile already existed, so the grades typed in the wizard go on as an edit.
+      // The profile already existed, so the phone and grades typed in the wizard go on as an edit.
       const grades = Object.fromEntries(
-        ([["gpa", gpa], ["sat", sat], ["act", act], ["intendedMajor", study ?? ""]] as const).filter(([, v]) => v.trim()).map(([k, v]) => [k, v.trim()]),
+        ([["phone", phoneDigits(phone)], ["gpa", gpa], ["sat", sat], ["act", act], ["intendedMajor", study ?? ""]] as const).filter(([, v]) => v.trim()).map(([k, v]) => [k, v.trim()]),
       )
       if (Object.keys(grades).length > 0) await saveAthleteEdits(found.athleteId, grades).catch(() => undefined)
       setResult({ athleteId: found.athleteId, athleteName: found.athleteName })
@@ -211,6 +213,21 @@ export default function CreateProfileScreen() {
               )}
             </View>
           ))}
+        </>
+      ) : null}
+
+      {step === "phone" ? (
+        <>
+          <Question
+            title={rel === "self" ? "Your cell number?" : "Your wrestler's cell number?"}
+            hint={
+              rel === "self"
+                ? "This is how college coaches reach you. Only verified college coaches can see it."
+                : "This is how college coaches reach your wrestler — use yours if they don't have one yet. Only verified college coaches can see it."
+            }
+          />
+          <Field value={phone} onChange={(v) => setPhone(formatPhone(v))} placeholder="(919) 555-0100" keyboard="phone-pad" autoFocus />
+          <Next disabled={phoneDigits(phone).length !== 10} onPress={next} />
         </>
       ) : null}
 
@@ -369,6 +386,20 @@ const STUDY = [
   "Military / ROTC",
 ] as const
 
+/** The 10 digits, without a leading US country code. */
+function phoneDigits(v: string): string {
+  const d = v.replace(/\D/g, "")
+  return d.length === 11 && d[0] === "1" ? d.slice(1) : d
+}
+
+/** (919) 555-0100 as it is typed. */
+function formatPhone(v: string): string {
+  const d = phoneDigits(v).slice(0, 10)
+  if (d.length < 4) return d
+  if (d.length < 7) return `(${d.slice(0, 3)}) ${d.slice(3)}`
+  return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`
+}
+
 /** Blank is fine; anything typed has to be a real score. */
 function checkAcademics(gpa: string, sat: string, act: string): string | null {
   const bad = (v: string, min: number, max: number) => v.trim() !== "" && !(Number(v) >= min && Number(v) <= max)
@@ -394,7 +425,7 @@ function Field(props: {
   onChange: (v: string) => void
   placeholder: string
   autoFocus?: boolean
-  keyboard?: "decimal-pad" | "number-pad"
+  keyboard?: "decimal-pad" | "number-pad" | "phone-pad"
 }) {
   return (
     <TextInput
@@ -405,6 +436,7 @@ function Field(props: {
       placeholderTextColor={colors.textMuted}
       autoFocus={props.autoFocus}
       keyboardType={props.keyboard ?? "default"}
+      textContentType={props.keyboard === "phone-pad" ? "telephoneNumber" : undefined}
       autoCapitalize="words"
       autoCorrect={false}
       returnKeyType="next"
