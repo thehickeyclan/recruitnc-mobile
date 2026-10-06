@@ -249,14 +249,7 @@ export default function SignInScreen() {
               </Text>
               <Pressable
                 style={styles.recruitButton}
-                onPress={() =>
-                  void WebBrowser.openBrowserAsync(`${WEB}/create-profile`, {
-                    presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
-                    toolbarColor: colors.ink,
-                    controlsColor: colors.gold,
-                    dismissButtonStyle: "done",
-                  }).catch(() => undefined)
-                }
+                onPress={() => router.replace("/create-profile" as never)}
               >
                 <Ionicons name="person-add-outline" size={16} color={colors.ink} />
                 <Text style={styles.recruitButtonText}>Build my recruiting profile</Text>

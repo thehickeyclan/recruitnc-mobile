@@ -143,6 +143,14 @@ export default function MoreScreen() {
                 <Text style={styles.rowDetail}>{session?.user?.email ?? ""}</Text>
               </View>
             </View>
+            {/* For the wrestler the search did not find - most have a profile from results already. */}
+            <Pressable style={[styles.row, styles.rowDivider]} onPress={() => router.push("/create-profile" as never)}>
+              <View style={styles.rowBody}>
+                <Text style={styles.rowTitle}>Create a profile</Text>
+                <Text style={styles.rowDetail}>For you or your wrestler — free, about a minute</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            </Pressable>
             {/* Linking is what college-interest alerts, editing and Blue all hang off. */}
             <Pressable style={[styles.row, styles.rowDivider]} onPress={() => router.push("/my-wrestlers" as never)}>
               <View style={styles.rowBody}>

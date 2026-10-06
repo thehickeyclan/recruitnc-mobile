@@ -404,19 +404,21 @@ export default function AthleteProfileScreen() {
                     <Text style={styles.statLabel}>YEAR</Text>
                     <Text style={styles.statValue}>{athlete.graduationYear ?? "—"}</Text>
                   </View>
-                  <View style={[styles.stat, styles.statDivided]}>
-                    <Text style={styles.statLabel}>WEIGHT</Text>
-                    <Text style={styles.statValue}>{athlete.weight.display ? `${athlete.weight.display} lbs` : "—"}</Text>
+                  {/* Last competed only: the listed weight is a number the family typed once, and the
+                      weight a wrestler actually made - where and when - is what a coach reads. */}
+                  <View style={[styles.stat, styles.statDivided, styles.flex]}>
+                    <Text style={styles.statLabel}>LAST COMPETED</Text>
+                    {athlete.weight.lastCompeted?.weight ? (
+                      <>
+                        <Text style={styles.statValueSmall}>{athlete.weight.lastCompeted.weight} lbs</Text>
+                        <Text style={styles.statSub} numberOfLines={2}>
+                          {[athlete.weight.lastCompeted.event, athlete.weight.lastCompeted.year].filter(Boolean).join(" ")}
+                        </Text>
+                      </>
+                    ) : (
+                      <Text style={styles.statSub}>No results on file yet</Text>
+                    )}
                   </View>
-                  {athlete.weight.lastCompeted?.weight ? (
-                    <View style={[styles.stat, styles.statDivided, styles.flex]}>
-                      <Text style={styles.statLabel}>LAST COMPETED</Text>
-                      <Text style={styles.statValueSmall}>{athlete.weight.lastCompeted.weight} lbs</Text>
-                      <Text style={styles.statSub} numberOfLines={2}>
-                        {[athlete.weight.lastCompeted.event, athlete.weight.lastCompeted.year].filter(Boolean).join(" ")}
-                      </Text>
-                    </View>
-                  ) : null}
                 </View>
               </View>
 
