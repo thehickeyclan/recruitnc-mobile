@@ -8,6 +8,7 @@ import * as SplashScreen from "expo-splash-screen"
 import { colors } from "@/theme/tokens"
 import { useFirstLaunchUpdate } from "@/lib/first-launch-update"
 import { usePushAccountSync } from "@/lib/push-account-sync"
+import { useAppBadge } from "@/lib/app-badge"
 
 void SplashScreen.preventAutoHideAsync()
 
@@ -49,6 +50,7 @@ export default function RootLayout() {
   const ready = useFirstLaunchUpdate()
   useNotificationTaps()
   usePushAccountSync()
+  useAppBadge()
 
   useEffect(() => {
     if (ready) void SplashScreen.hideAsync()

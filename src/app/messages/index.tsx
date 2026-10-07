@@ -88,6 +88,7 @@ export default function MessagesScreen() {
                     <Text style={[styles.name, t.unread ? styles.nameUnread : null]} numberOfLines={1}>
                       {threadTitle(t)}
                     </Text>
+                    {t.unread ? <Text style={styles.newPill}>NEW</Text> : t.yourTurn ? <Text style={styles.turnPill}>REPLY</Text> : null}
                     <Text style={styles.date}>{shortDate(t.lastMessageAt)}</Text>
                   </View>
                   {t.viewerRole !== "coach" ? (
@@ -138,6 +139,8 @@ const styles = StyleSheet.create({
   name: { ...type.body, color: colors.textSecondary, fontWeight: "600", flex: 1 },
   nameUnread: { color: colors.text, fontWeight: "800" },
   date: { ...type.label, color: colors.textMuted, fontWeight: "500" },
+  newPill: { ...type.caption, fontSize: 10, color: colors.ink, backgroundColor: colors.gold, paddingHorizontal: 6, paddingVertical: 2, borderRadius: radius.pill, overflow: "hidden" },
+  turnPill: { ...type.caption, fontSize: 10, color: colors.gold, borderWidth: 1, borderColor: colors.gold, paddingHorizontal: 6, paddingVertical: 1, borderRadius: radius.pill, overflow: "hidden" },
   program: { ...type.label, color: colors.gold, marginTop: 2 },
   preview: { ...type.label, color: colors.textMuted, fontWeight: "500", marginTop: 4 },
 })

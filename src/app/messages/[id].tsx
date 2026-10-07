@@ -17,6 +17,7 @@ import Ionicons from "@expo/vector-icons/Ionicons"
 
 import { useSession } from "@/lib/auth"
 import { fetchThread, reportThread, sendReply, setStopped, shortDate, type ThreadDetail } from "@/lib/coach-messages"
+import { syncAppBadge } from "@/lib/app-badge"
 import { colors, radius, space, type } from "@/theme/tokens"
 
 /**
@@ -40,6 +41,8 @@ export default function ConversationScreen() {
     try {
       setThread(await fetchThread(threadId))
       setError(null)
+      // Reading it marked it read on the server; bring the icon's number down with it.
+      void syncAppBadge(true)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load this conversation.")
     }

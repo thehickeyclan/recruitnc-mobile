@@ -24,6 +24,8 @@ export type ThreadSummary = {
   unread: boolean
   stopped: boolean
   viewerRole: Exclude<ThreadRole, "admin">
+  /** The other side wrote last (servers before 7 Oct 2026 omit it). */
+  yourTurn?: boolean
 }
 
 export type ThreadMessage = { id: string; body: string; senderRole: string; senderName: string; createdAt: string; mine: boolean }
@@ -58,8 +60,10 @@ async function call<T>(path: string, init: { method?: "GET" | "POST"; body?: unk
   return body as T
 }
 
-export async function fetchThreads(): Promise<ThreadSummary[]> {
-  return (await call<{ threads?: ThreadSummary[] }>("/api/coach-messages")).threads ?? []
+/** Every conversation this account is in; `athleteId` narrows to one wrestler. */
+export async function fetchThreads(athleteId?: string): Promise<ThreadSummary[]> {
+  const qs = athleteId ? `?athleteId=${encodeURIComponent(athleteId)}` : ""
+  return (await call<{ threads?: ThreadSummary[] }>(`/api/coach-messages${qs}`)).threads ?? []
 }
 
 export async function fetchThread(id: string): Promise<ThreadDetail> {
