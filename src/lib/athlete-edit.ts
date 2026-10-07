@@ -72,12 +72,17 @@ export async function loadAthleteEdits(
   return { fields: { ...body.fields, phone: body.fields.phone ?? "" }, relationship: body.relationship ?? "self" }
 }
 
-export async function claimAthleteProfile(athleteId: string, as: "self" | "parent"): Promise<void> {
+/** `fill` comes from the create-profile wizard: the server writes it only where the profile is blank. */
+export async function claimAthleteProfile(
+  athleteId: string,
+  as: "self" | "parent",
+  fill?: { graduationYear?: number | null; highSchool?: string | null },
+): Promise<void> {
   if (!BASE) throw new Error("This build has no EXPO_PUBLIC_WEB_BASE_URL.")
   const response = await fetch(`${BASE}/api/mobile/v1/athlete/${encodeURIComponent(athleteId)}/claim`, {
     method: "POST",
     headers: await authHeaders(),
-    body: JSON.stringify({ as }),
+    body: JSON.stringify({ as, ...(fill ?? {}) }),
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })
   if (!response.ok) throw new Error(await readError(response, "Could not claim that profile."))

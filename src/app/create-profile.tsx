@@ -115,7 +115,8 @@ export default function CreateProfileScreen() {
     setError(null)
     setStep("saving")
     try {
-      await claimAthleteProfile(found.athleteId, rel)
+      // Girls imported without a class year get one from this: the server fills blanks only.
+      await claimAthleteProfile(found.athleteId, rel, { graduationYear: year, highSchool: school.trim() || null })
       // The profile already existed, so the phone and grades typed in the wizard go on as an edit.
       const grades = Object.fromEntries(
         ([["phone", phoneDigits(phone)], ["gpa", gpa], ["sat", sat], ["act", act], ["intendedMajor", study ?? ""]] as const).filter(([, v]) => v.trim()).map(([k, v]) => [k, v.trim()]),
