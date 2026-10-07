@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context"
 import { router } from "expo-router"
 import Ionicons from "@expo/vector-icons/Ionicons"
 
+import { CreateProfileCard } from "@/components/create-profile-card"
 import { colors, radius, space, type } from "@/theme/tokens"
 
 /**
@@ -131,13 +132,7 @@ export default function AthletesScreen() {
         {!loading && !error && rows.length === 0 && (
           <Text style={styles.empty}>No wrestlers match that. Try fewer filters.</Text>
         )}
-        {/* Not finding yourself is the moment to make the profile - one tap, not a hunt. */}
-        {!loading && !error && (rows.length === 0 || rows.length < 6) ? (
-          <Pressable style={styles.create} onPress={() => router.push("/create-profile" as never)}>
-            <Ionicons name="person-add" size={16} color={colors.ink} />
-            <Text style={styles.createText}>Not listed? Create your free profile</Text>
-          </Pressable>
-        ) : null}
+        <CreateProfileCard />
         {rows.map((a) => (
           <Pressable key={a.id} style={styles.card} onPress={() => router.push(`/athlete/${a.id}`)}>
             <View style={styles.cardBody}>
@@ -222,15 +217,4 @@ const styles = StyleSheet.create({
   reportButton: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
   error: { color: "#fca5a5", textAlign: "center", marginTop: space.lg },
   empty: { color: colors.textMuted, textAlign: "center", marginTop: space.lg },
-  create: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: space.sm,
-    backgroundColor: colors.gold,
-    borderRadius: radius.md,
-    paddingVertical: space.md,
-    marginTop: space.lg,
-  },
-  createText: { ...type.label, color: colors.ink, fontWeight: "800" },
 })

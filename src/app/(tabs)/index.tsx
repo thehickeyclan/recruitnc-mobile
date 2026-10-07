@@ -12,6 +12,7 @@ import { tocIsOver } from "@/lib/toc-live"
 import { TocMadnessCard } from "@/components/toc-madness-card"
 import { fetchLatestNews, type NewsItem } from "@/lib/news"
 import { openWebPage } from "@/lib/profile-link"
+import { CreateProfileCard } from "@/components/create-profile-card"
 
 /**
  * Home — what is happening right now, in the order it matters.
@@ -145,6 +146,8 @@ export default function HomeScreen() {
             <Text style={styles.title}>North Carolina wrestling, all of it</Text>
           </View>
         </View>
+
+        <CreateProfileCard />
 
         {news[0] ? (
           <View style={styles.storySection}>
