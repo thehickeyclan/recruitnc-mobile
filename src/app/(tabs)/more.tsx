@@ -6,7 +6,7 @@ import * as WebBrowser from "expo-web-browser"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors, radius, space, type } from "@/theme/tokens"
 import { router, useFocusEffect } from "expo-router"
-import { fetchUnreadCount } from "@/lib/coach-messages"
+import { fetchMessagingSummary } from "@/lib/coach-messages"
 import { DEFAULT_PREFS, PushUnavailableError, registerForPush, syncDevice, withAlertDefaults, type AlertPrefs } from "@/lib/push"
 import { deleteAccount, signOut, useSession } from "@/lib/auth"
 import { bracketsLabel, tocIsOver, tocPhase } from "@/lib/toc-live"
@@ -49,13 +49,19 @@ export default function MoreScreen() {
   const { session, signedIn } = useSession()
   /** Coach conversations with something unread, for the badge on Messages. */
   const [unreadMessages, setUnreadMessages] = useState(0)
+  /** Coaches always; families only once a coach has written - nobody meets an empty inbox. */
+  const [showMessages, setShowMessages] = useState(false)
   useFocusEffect(
     useCallback(() => {
       if (!signedIn) {
         setUnreadMessages(0)
+        setShowMessages(false)
         return
       }
-      void fetchUnreadCount().then(setUnreadMessages)
+      void fetchMessagingSummary().then((m) => {
+        setUnreadMessages(m.unread)
+        setShowMessages(m.show)
+      })
     }, [signedIn]),
   )
   const [prefs, setPrefs] = useState<AlertPrefs>(DEFAULT_PREFS)
@@ -164,10 +170,11 @@ export default function MoreScreen() {
               <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
             </Pressable>
             {/* Coaches start every conversation; families read and reply here. */}
+            {showMessages ? (
             <Pressable style={[styles.row, styles.rowDivider]} onPress={() => router.push("/messages" as never)}>
               <View style={styles.rowBody}>
                 <Text style={styles.rowTitle}>Messages</Text>
-                <Text style={styles.rowDetail}>From college coaches about your wrestler</Text>
+                <Text style={styles.rowDetail}>Conversations between college coaches and families</Text>
               </View>
               {unreadMessages > 0 ? (
                 <View style={styles.unreadBadge}>
@@ -176,6 +183,7 @@ export default function MoreScreen() {
               ) : null}
               <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
             </Pressable>
+            ) : null}
             {/* Linking is what college-interest alerts, editing and Blue all hang off. */}
             <Pressable style={[styles.row, styles.rowDivider]} onPress={() => router.push("/my-wrestlers" as never)}>
               <View style={styles.rowBody}>

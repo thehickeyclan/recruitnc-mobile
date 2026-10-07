@@ -6,6 +6,7 @@ import { router, useLocalSearchParams } from "expo-router"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons"
 import { CoachMessagesCard } from "@/components/coach-messages-card"
+import { CoachMessageAction } from "@/components/coach-message-action"
 import { colors, radius, space, type } from "@/theme/tokens"
 import { openAthleteProfile, openWebPage } from "@/lib/profile-link"
 import { claimAthleteProfile, currentUserId, loadAthleteEdits } from "@/lib/athlete-edit"
@@ -452,6 +453,8 @@ export default function AthleteProfileScreen() {
 
               {/* Messages from college coaches live on the wrestler's own screen, for the family. */}
               {standing === "mine" ? <CoachMessagesCard athleteId={String(id)} /> : null}
+              {/* College coaches: renders nothing for anyone else. */}
+              {standing === "other" ? <CoachMessageAction athleteId={String(id)} athleteName={athlete.name} /> : null}
 
               {standing === "mine" ? (
                 // Matt: if someone owns the profile, make it obvious they can edit it.
@@ -583,6 +586,8 @@ export default function AthleteProfileScreen() {
           ) : null}
 
           {standing === "mine" ? <CoachMessagesCard athleteId={String(id)} /> : null}
+              {/* College coaches: renders nothing for anyone else. */}
+              {standing === "other" ? <CoachMessageAction athleteId={String(id)} athleteName={athlete.name} /> : null}
 
           {standing === "mine" ? (
             <Pressable

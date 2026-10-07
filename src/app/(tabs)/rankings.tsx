@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from "react"
+import { CoachMessagingIntro } from "@/components/coach-messaging-intro"
 import {
   ActivityIndicator,
   FlatList,
@@ -131,6 +132,8 @@ export default function RankingsScreen() {
         <Text style={styles.eyebrow}>RECRUITNC</Text>
         <Text style={styles.title}>Rankings</Text>
       </View>
+
+      <CoachMessagingIntro />
 
       {/*
         * A plain row, not a horizontal ScrollView.

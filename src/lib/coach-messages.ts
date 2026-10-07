@@ -82,13 +82,46 @@ export async function reportThread(id: string, reason: string): Promise<void> {
   await call(`/api/coach-messages/${encodeURIComponent(id)}/report`, { method: "POST", body: { reason } })
 }
 
+export type MessagingSummary = {
+  unread: number
+  total: number
+  /** Coaches and admins always; anyone else only once a coach has written to them. */
+  show: boolean
+  /** A coach staff have confirmed: may start conversations. */
+  canStart: boolean
+}
+
+/** Nothing to show when signed out or offline. Servers before 7 Oct 2026 send only `unread`. */
+export async function fetchMessagingSummary(): Promise<MessagingSummary> {
+  try {
+    const d = await call<Partial<MessagingSummary>>("/api/coach-messages/unread")
+    const unread = Number(d.unread) || 0
+    return { unread, total: Number(d.total) || 0, show: d.show ?? unread > 0, canStart: Boolean(d.canStart) }
+  } catch {
+    return { unread: 0, total: 0, show: false, canStart: false }
+  }
+}
+
 /** Zero when signed out or offline - this only drives a badge. */
 export async function fetchUnreadCount(): Promise<number> {
+  return (await fetchMessagingSummary()).unread
+}
+
+export type Eligibility = { show: boolean; canSend?: boolean; threadId?: string | null; message?: string }
+
+/** Whether this account may message this wrestler (a confirmed college coach), and any existing thread. */
+export async function fetchEligibility(athleteId: string): Promise<Eligibility> {
   try {
-    return Number((await call<{ unread?: number }>("/api/coach-messages/unread")).unread) || 0
+    return await call<Eligibility>(`/api/coach-messages/eligibility?athleteId=${encodeURIComponent(athleteId)}`)
   } catch {
-    return 0
+    return { show: false }
   }
+}
+
+/** A coach's first message to a wrestler; returns the conversation it opened. */
+export async function startConversation(athleteId: string, body: string): Promise<string> {
+  const r = await call<{ threadId: string }>("/api/coach-messages", { method: "POST", body: { athleteId, body } })
+  return r.threadId
 }
 
 /** The name a thread is listed under: the coach for a family, the wrestler for a coach. */
