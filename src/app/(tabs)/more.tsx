@@ -5,7 +5,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage"
 import * as WebBrowser from "expo-web-browser"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors, radius, space, type } from "@/theme/tokens"
-import { router } from "expo-router"
+import { router, useFocusEffect } from "expo-router"
+import { fetchUnreadCount } from "@/lib/coach-messages"
 import { DEFAULT_PREFS, PushUnavailableError, registerForPush, syncDevice, withAlertDefaults, type AlertPrefs } from "@/lib/push"
 import { deleteAccount, signOut, useSession } from "@/lib/auth"
 import { bracketsLabel, tocIsOver, tocPhase } from "@/lib/toc-live"
@@ -46,6 +47,17 @@ const ALERTS: { key: keyof AlertPrefs; title: string; detail: string }[] = [
 
 export default function MoreScreen() {
   const { session, signedIn } = useSession()
+  /** Coach conversations with something unread, for the badge on Messages. */
+  const [unreadMessages, setUnreadMessages] = useState(0)
+  useFocusEffect(
+    useCallback(() => {
+      if (!signedIn) {
+        setUnreadMessages(0)
+        return
+      }
+      void fetchUnreadCount().then(setUnreadMessages)
+    }, [signedIn]),
+  )
   const [prefs, setPrefs] = useState<AlertPrefs>(DEFAULT_PREFS)
   const [enabled, setEnabled] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -149,6 +161,19 @@ export default function MoreScreen() {
                 <Text style={styles.rowTitle}>Create a profile</Text>
                 <Text style={styles.rowDetail}>For you or your wrestler — free, about a minute</Text>
               </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            </Pressable>
+            {/* Coaches start every conversation; families read and reply here. */}
+            <Pressable style={[styles.row, styles.rowDivider]} onPress={() => router.push("/messages" as never)}>
+              <View style={styles.rowBody}>
+                <Text style={styles.rowTitle}>Messages</Text>
+                <Text style={styles.rowDetail}>From college coaches about your wrestler</Text>
+              </View>
+              {unreadMessages > 0 ? (
+                <View style={styles.unreadBadge}>
+                  <Text style={styles.unreadBadgeText}>{unreadMessages}</Text>
+                </View>
+              ) : null}
               <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
             </Pressable>
             {/* Linking is what college-interest alerts, editing and Blue all hang off. */}
@@ -377,6 +402,8 @@ const styles = StyleSheet.create({
   rowDivider: { borderTopWidth: 1, borderTopColor: colors.line },
   rowBody: { flex: 1, gap: 2 },
   rowTitle: { ...type.body, color: colors.text, fontWeight: "600" },
+  unreadBadge: { minWidth: 22, height: 22, paddingHorizontal: 6, borderRadius: 11, backgroundColor: colors.gold, alignItems: "center", justifyContent: "center", marginRight: space.xs },
+  unreadBadgeText: { ...type.label, color: colors.ink, fontWeight: "800" },
   rowDetail: { ...type.label, color: colors.textMuted, fontWeight: "500" },
   linkTitle: { ...type.body, color: colors.text, fontWeight: "600" },
   destructive: { color: colors.red },
