@@ -34,6 +34,7 @@ import {
  */
 
 const EMPTY: AthleteEditFields = {
+  phone: "",
   gpa: "",
   sat: "",
   act: "",
@@ -54,15 +55,17 @@ function Field({
   autoCapitalize,
   multiline,
   placeholder,
+  autoFocus,
 }: {
   label: string
   hint?: string
   value: string
   onChangeText: (v: string) => void
-  keyboardType?: "default" | "numeric" | "decimal-pad" | "url"
+  keyboardType?: "default" | "numeric" | "decimal-pad" | "url" | "phone-pad"
   autoCapitalize?: "none" | "sentences" | "words"
   multiline?: boolean
   placeholder?: string
+  autoFocus?: boolean
 }) {
   return (
     <View style={styles.field}>
@@ -78,13 +81,15 @@ function Field({
         autoCapitalize={autoCapitalize ?? "sentences"}
         autoCorrect={!multiline ? false : undefined}
         multiline={multiline}
+        autoFocus={autoFocus}
       />
     </View>
   )
 }
 
 export default function AthleteEditScreen() {
-  const { id, name } = useLocalSearchParams<{ id: string; name?: string }>()
+  // `focus` comes from the Home card ("Add Jaxon's cell number") and opens on that field.
+  const { id, name, focus } = useLocalSearchParams<{ id: string; name?: string; focus?: string }>()
   const [original, setOriginal] = useState<AthleteEditFields>(EMPTY)
   const [fields, setFields] = useState<AthleteEditFields>(EMPTY)
   const [loading, setLoading] = useState(true)
@@ -165,9 +170,22 @@ export default function AthleteEditScreen() {
               What college coaches look for first. Anything you leave blank simply does not show.
             </Text>
 
+            <Text style={styles.sectionHeading}>CONTACT</Text>
+            <Field
+              label="Cell number"
+              hint="How college coaches reach you. Only verified college coaches can see it."
+              value={fields.phone}
+              onChangeText={set("phone")}
+              keyboardType="phone-pad"
+              autoCapitalize="none"
+              placeholder="(919) 555-0100"
+              autoFocus={focus === "phone"}
+            />
+
             <Text style={styles.sectionHeading}>ACADEMICS</Text>
             <Field
               label="GPA"
+              autoFocus={focus === "gpa"}
               hint="Weighted or unweighted — whichever your school reports."
               value={fields.gpa}
               onChangeText={set("gpa")}
@@ -203,6 +221,7 @@ export default function AthleteEditScreen() {
             />
             <Field
               label="Highlight film"
+              autoFocus={focus === "film"}
               hint="The first thing a college coach asks for after your record."
               value={fields.highlightVideoUrl}
               onChangeText={set("highlightVideoUrl")}

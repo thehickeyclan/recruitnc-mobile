@@ -13,6 +13,7 @@ const BASE = process.env.EXPO_PUBLIC_WEB_BASE_URL
 const REQUEST_TIMEOUT_MS = 20_000
 
 export type AthleteEditFields = {
+  phone: string
   gpa: string
   sat: string
   act: string
@@ -67,7 +68,8 @@ export async function loadAthleteEdits(
     | { ok?: boolean; fields?: AthleteEditFields; relationship?: "self" | "parent" }
     | null
   if (!response.ok || !body?.ok || !body.fields) return null
-  return { fields: body.fields, relationship: body.relationship ?? "self" }
+  // A server older than the field sends no phone; treat it as blank rather than undefined.
+  return { fields: { ...body.fields, phone: body.fields.phone ?? "" }, relationship: body.relationship ?? "self" }
 }
 
 export async function claimAthleteProfile(athleteId: string, as: "self" | "parent"): Promise<void> {
