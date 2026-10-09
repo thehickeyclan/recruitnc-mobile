@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react"
-import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native"
+import { ActivityIndicator, Alert, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native"
+import { supabase } from "@/lib/supabase"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { Image } from "expo-image"
 import { router, useLocalSearchParams } from "expo-router"
@@ -7,6 +8,7 @@ import Ionicons from "@expo/vector-icons/Ionicons"
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons"
 import { CoachMessagesCard } from "@/components/coach-messages-card"
 import { CoachMessageAction } from "@/components/coach-message-action"
+import { fetchEligibility } from "@/lib/coach-messages"
 import { colors, radius, space, type } from "@/theme/tokens"
 import { openAthleteProfile, openWebPage } from "@/lib/profile-link"
 import { claimAthleteProfile, currentUserId, loadAthleteEdits } from "@/lib/athlete-edit"
@@ -14,7 +16,17 @@ import { fetchFollowState, setFollowing } from "@/lib/follows"
 import { fetchScoutingAccess } from "@/lib/scouting-report"
 import {
   STYLE_LABEL,
+  fetchPrivateDetails,
+  fetchCollegeInterest,
+  type CollegeInterest,
+  fetchCollegeLogo,
   fetchAthleteProfile,
+  fetchSignificantWins,
+  groupByEvent,
+  significantWinsLine,
+  boutAccolade,
+  type Academics,
+  type SignificantWin,
   hasV2,
   profileMetaLine,
   rowSummary,
@@ -46,7 +58,13 @@ function initials(name: string): string {
   return ((parts[0]?.[0] ?? "") + (parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? "") : "")).toUpperCase()
 }
 
-function TournamentRow({ row }: { row: ProfileTournamentRow }) {
+/** "Junior Girls Freestyle" out of "… Championships - Junior Girls Freestyle", or "" when none. */
+function divisionOf(event: string): string {
+  const parts = event.split(/\s+[-·]\s+/)
+  return parts.length > 1 ? parts[parts.length - 1]!.trim() : ""
+}
+
+function TournamentRow({ row, compact = false }: { row: ProfileTournamentRow; compact?: boolean }) {
   const [open, setOpen] = useState(false)
   const summary = rowSummary(row)
   const bouts = row.bouts ?? []
@@ -59,10 +77,19 @@ function TournamentRow({ row }: { row: ProfileTournamentRow }) {
         accessibilityRole={bouts.length > 0 ? "button" : "text"}
       >
         <View style={styles.flex}>
-          <Text style={styles.tournamentEvent}>
-            {row.event} <Text style={styles.tournamentYear}>{row.year}</Text>
-          </Text>
-          {row.team ? <Text style={styles.tournamentTeam}>{row.team}</Text> : null}
+          {compact ? (
+            // Under its event's heading a year says the rest: "2026 · Junior Girls Freestyle".
+            <Text style={styles.tournamentEvent}>
+              {[String(row.year), row.team, divisionOf(row.event)].filter(Boolean).join(" · ")}
+            </Text>
+          ) : (
+            <>
+              <Text style={styles.tournamentEvent}>
+                {row.event} <Text style={styles.tournamentYear}>{row.year}</Text>
+              </Text>
+              {row.team ? <Text style={styles.tournamentTeam}>{row.team}</Text> : null}
+            </>
+          )}
           {summary ? <Text style={styles.tournamentSummary}>{summary}</Text> : null}
         </View>
         {bouts.length > 0 ? (
@@ -178,6 +205,280 @@ function RowList({ rows, dualsLabel }: { rows: ProfileTournamentRow[]; dualsLabe
   )
 }
 
+type IconName = React.ComponentProps<typeof Ionicons>["name"]
+
+/** One overview row: an icon, a title, a line of real data; opens in place or goes somewhere. */
+function OverviewRow({
+  icon,
+  title,
+  subtitle,
+  onPress,
+  children,
+}: {
+  icon: IconName
+  title: string
+  subtitle: string
+  onPress?: () => void
+  children?: React.ReactNode
+}) {
+  const [open, setOpen] = useState(false)
+  const expandable = Boolean(children)
+  return (
+    <View style={styles.ovCard}>
+      <Pressable
+        style={styles.ovHead}
+        accessibilityRole="button"
+        onPress={() => (expandable ? setOpen((v) => !v) : onPress?.())}
+      >
+        <Ionicons name={icon} size={20} color={colors.gold} />
+        <View style={styles.flex}>
+          <Text style={styles.ovTitle}>{title}</Text>
+          <Text style={styles.ovSubtitle} numberOfLines={2}>{subtitle}</Text>
+        </View>
+        <Ionicons
+          name={expandable ? (open ? "chevron-up" : "chevron-down") : onPress ? "chevron-forward" : "lock-closed-outline"}
+          size={16}
+          color={colors.textMuted}
+        />
+      </Pressable>
+      {expandable && open ? <View style={styles.ovBody}>{children}</View> : null}
+    </View>
+  )
+}
+
+/**
+ * Significant wins or notable losses, In-state | National (Matt, 8 Oct 2026). National means an
+ * opponent from another state; it opens on National when there is one, the stronger list.
+ */
+function BoutList({ bouts }: { bouts: SignificantWin[] }) {
+  const national = bouts.filter((b) => b.scope === "national")
+  const inState = bouts.filter((b) => b.scope !== "national")
+  const [tab, setTab] = useState<"in-state" | "national">(national.length ? "national" : "in-state")
+  const [showAll, setShowAll] = useState(false)
+  const list = tab === "national" ? national : inState
+  const shown = showAll ? list : list.slice(0, 6)
+  return (
+    <View style={styles.winList}>
+      <View style={[styles.toggle, styles.toggleStart]}>
+        {(["in-state", "national"] as const).map((k) => (
+          <Pressable
+            key={k}
+            style={[styles.toggleButton, tab === k && styles.toggleOn]}
+            accessibilityRole="button"
+            accessibilityState={{ selected: tab === k }}
+            onPress={() => {
+              setTab(k)
+              setShowAll(false)
+            }}
+          >
+            <Text style={[styles.toggleText, tab === k && styles.toggleTextOn]}>
+              {k === "national" ? `National (${national.length})` : `In-state (${inState.length})`}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+      {shown.length ? (
+        shown.map((w, i) => (
+          <View key={`${w.opponent}-${w.date}-${i}`} style={styles.winRow}>
+            <Text style={styles.winOpponent}>
+              {w.opponent}
+              {w.opponentSchool ? <Text style={styles.winSchool}>{`  ${w.opponentSchool}`}</Text> : null}
+            </Text>
+            {boutAccolade(w) ? <Text style={styles.winAccolade}>{boutAccolade(w)}</Text> : null}
+            <Text style={styles.winDetail}>{[w.result, w.event].filter(Boolean).join(" · ")}</Text>
+          </View>
+        ))
+      ) : (
+        <Text style={styles.winDetail}>{tab === "national" ? "None against out-of-state opponents on file." : "None against NC opponents on file."}</Text>
+      )}
+      {list.length > 6 && !showAll ? (
+        <Pressable accessibilityRole="button" onPress={() => setShowAll(true)}>
+          <Text style={styles.seeAllText}>{`See all ${list.length}`}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  )
+}
+
+function collegeInterestLine(i: CollegeInterest | null): string {
+  if (!i) return "Which college programs viewed your profile"
+  if (i.locked) {
+    return i.programCount
+      ? `${i.programCount} college program${i.programCount === 1 ? "" : "s"} viewed your profile`
+      : "No college views yet"
+  }
+  if (!i.schools.length) return "No college views yet"
+  const lead = i.schools[0]!.school
+  return i.schools.length > 1 ? `${lead} and ${i.schools.length - 1} more viewed your profile` : `${lead} viewed your profile`
+}
+
+function CollegeInterestBody({ interest: i }: { interest: CollegeInterest }) {
+  if (i.locked) {
+    return (
+      <View style={styles.winList}>
+        <Text style={styles.winDetail}>
+          {i.programCount
+            ? `${i.totalViews} view${i.totalViews === 1 ? "" : "s"} from ${i.programCount} program${i.programCount === 1 ? "" : "s"}. NC United Blue members see which programs.`
+            : "When a college coach opens your profile, the program shows here. Keep your results, film and GPA current."}
+        </Text>
+        {i.programCount ? (
+          <Pressable style={styles.contactButton} onPress={() => router.push("/blue-subscription")}>
+            <Text style={styles.contactButtonText}>SEE WHICH PROGRAMS</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    )
+  }
+  if (!i.schools.length) {
+    return <Text style={styles.winDetail}>When a college coach opens your profile, the program shows here.</Text>
+  }
+  return (
+    <View style={styles.winList}>
+      {i.schools.map((s) => (
+        <View key={s.school} style={styles.winRow}>
+          <Text style={styles.winOpponent}>{s.school}</Text>
+          <Text style={styles.winDetail}>
+            {`${s.views} view${s.views === 1 ? "" : "s"} · last ${new Date(s.lastViewedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`}
+          </Text>
+        </View>
+      ))}
+      <Text style={styles.acadNote}>Programs only, never the coach's name.</Text>
+    </View>
+  )
+}
+
+const hasAcademics = (a: Academics) => Boolean(a.gpa || a.sat || a.act || a.interest || a.summary)
+
+/** The row's line. Academics are private: approved coaches, the family and admins only. */
+function academicsLine(a: Academics | null): string {
+  if (!a) return "Visible to approved college coaches"
+  if (!hasAcademics(a)) return "Not added yet"
+  return [a.gpa ? `${a.gpa.toFixed(2)} GPA` : null, a.sat ? `SAT ${a.sat}` : null, a.act ? `ACT ${a.act}` : null]
+    .filter(Boolean)
+    .join(" · ") || (a.interest ?? "Added")
+}
+
+function AcademicsBody({ academics: a }: { academics: Academics }) {
+  const tiles = [
+    a.gpa ? { label: "GPA", value: a.gpa.toFixed(2) } : null,
+    a.sat ? { label: "SAT", value: String(a.sat) } : null,
+    a.act ? { label: "ACT", value: String(a.act) } : null,
+  ].filter(Boolean) as { label: string; value: string }[]
+  return (
+    <View style={styles.winList}>
+      {tiles.length ? (
+        <View style={styles.acadTiles}>
+          {tiles.map((t) => (
+            <View key={t.label} style={styles.acadTile}>
+              <Text style={styles.acadLabel}>{t.label}</Text>
+              <Text style={styles.acadValue}>{t.value}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+      {a.interest ? (
+        <View style={styles.winRow}>
+          <Text style={styles.acadLabel}>ACADEMIC INTEREST</Text>
+          <Text style={styles.winOpponent}>{a.interest}</Text>
+        </View>
+      ) : null}
+      {a.summary ? <Text style={styles.winDetail}>{a.summary}</Text> : null}
+      <Text style={styles.acadNote}>Private: shown to approved college coaches, the family and admins.</Text>
+    </View>
+  )
+}
+
+/**
+ * Tournament Results, collapsed until tapped (Matt, 8 Oct 2026). Open, it sorts By event - the
+ * biggest events first, girls' freestyle ahead of folkstyle - or By date, three at a time until
+ * "See all". Each year still opens to its bouts.
+ */
+function TournamentResults({ athlete, isGirl }: { athlete: AthleteProfile; isGirl: boolean }) {
+  const [open, setOpen] = useState(false)
+  const [sort, setSort] = useState<"event" | "date">("event")
+  const [showAll, setShowAll] = useState(false)
+  const folk = [...(athlete.stateRows ?? []), ...(athlete.tocRows ?? []), ...(athlete.folkstyle ?? [])]
+  // Girls' Greco is off their résumé (Matt, 8 Oct 2026).
+  const olympic = (athlete.olympic ?? []).filter((r) => !(isGirl && /greco/i.test(`${r.event} ${r.team ?? ""}`)))
+  const groups = isGirl
+    ? [...groupByEvent(olympic, "freestyle"), ...groupByEvent(folk, "folkstyle")]
+    : [...groupByEvent(folk, "folkstyle"), ...groupByEvent(olympic, "freestyle")]
+  const byDate = [...folk, ...olympic].sort((a, b) =>
+    String((b as { sortKey?: string }).sortKey ?? b.year).localeCompare(String((a as { sortKey?: string }).sortKey ?? a.year)),
+  )
+  const total = byDate.length
+  const subtitle = athlete.banner?.credentials.slice(0, 2).map((c) => c.label).join(" · ") || `${total} events on file`
+
+  return (
+    <View style={[styles.ovCard, styles.ovCardGold]}>
+      <View style={styles.ovHead}>
+        <Pressable style={[styles.flex, styles.ovHeadInner]} accessibilityRole="button" onPress={() => setOpen((v) => !v)}>
+          <MaterialCommunityIcons name="trophy-outline" size={20} color={colors.gold} />
+          <View style={styles.flex}>
+            <Text style={styles.ovTitle}>Tournament Results</Text>
+            <Text style={styles.ovSubtitle} numberOfLines={2}>{subtitle}</Text>
+          </View>
+          {open ? null : <Ionicons name="chevron-down" size={16} color={colors.textMuted} />}
+        </Pressable>
+        {open ? (
+          <View style={styles.toggle}>
+            {(["event", "date"] as const).map((k) => (
+              <Pressable
+                key={k}
+                style={[styles.toggleButton, sort === k && styles.toggleOn]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: sort === k }}
+                onPress={() => setSort(k)}
+              >
+                <Text style={[styles.toggleText, sort === k && styles.toggleTextOn]}>{k === "event" ? "Event" : "Date"}</Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+      </View>
+      {open ? (
+        <View>
+          {sort === "event" ? (
+            <>
+              {(showAll ? groups : groups.slice(0, 3)).map((g, i, list) => (
+                <View key={`${g.style}-${g.name}`}>
+                  {isGirl && (i === 0 || list[i - 1]!.style !== g.style) ? (
+                    <Text style={[styles.styleLabel, g.style === "freestyle" ? styles.styleFree : styles.styleFolk]}>
+                      {g.style === "freestyle" ? "FREESTYLE" : "FOLKSTYLE"}
+                    </Text>
+                  ) : null}
+                  <Text style={styles.groupName}>{g.name}</Text>
+                  {g.rows.map((row) => (
+                    <TournamentRow key={row.id} row={row} compact />
+                  ))}
+                </View>
+              ))}
+              {groups.length > 3 ? (
+                <Pressable style={styles.seeAll} onPress={() => setShowAll((v) => !v)}>
+                  <Text style={styles.seeAllText}>{showAll ? "Show fewer" : `See all ${groups.length} tournaments`}</Text>
+                  <Ionicons name={showAll ? "chevron-up" : "chevron-forward"} size={14} color={colors.gold} />
+                </Pressable>
+              ) : null}
+            </>
+          ) : (
+            <>
+              {(showAll ? byDate : byDate.slice(0, 3)).map((row) => (
+                <TournamentRow key={row.id} row={row} />
+              ))}
+              {total > 3 ? (
+                <Pressable style={styles.seeAll} onPress={() => setShowAll((v) => !v)}>
+                  <Text style={styles.seeAllText}>{showAll ? "Show fewer" : `See all ${total} events`}</Text>
+                  <Ionicons name={showAll ? "chevron-up" : "chevron-forward"} size={14} color={colors.gold} />
+                </Pressable>
+              ) : null}
+            </>
+          )}
+        </View>
+      ) : null}
+    </View>
+  )
+}
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <View style={styles.section}>
@@ -189,7 +490,10 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 export default function AthleteProfileScreen() {
   // The name comes along from the list that opened this, so the header is right before the fetch is.
-  const { id, name } = useLocalSearchParams<{ id: string; name?: string }>()
+  const { id, name, preview } = useLocalSearchParams<{ id: string; name?: string; preview?: string }>()
+  /* Development builds only: "?preview=coach" shows the coach's buttons without a coach account,
+     so the layout can be reviewed in the simulator. __DEV__ is false in every build phones get. */
+  const previewCoach = __DEV__ && preview === "coach"
   const [athlete, setAthlete] = useState<AthleteProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -274,6 +578,76 @@ export default function AthleteProfileScreen() {
       .finally(() => setFollowBusy(false))
   }
 
+  const [collegeLogo, setCollegeLogo] = useState<string | null>(null)
+  const committedTo = athlete?.commitment?.college ?? null
+  useEffect(() => {
+    if (!committedTo) return
+    let cancelled = false
+    void fetchCollegeLogo(committedTo).then((url) => !cancelled && setCollegeLogo(url))
+    return () => {
+      cancelled = true
+    }
+  }, [committedTo])
+
+  const [wins, setWins] = useState<SignificantWin[]>([])
+  const [losses, setLosses] = useState<SignificantWin[]>([])
+  useEffect(() => {
+    let cancelled = false
+    void fetchSignificantWins(String(id)).then((r) => {
+      if (cancelled) return
+      setWins(r.wins)
+      setLosses(r.losses)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [id])
+
+  /* The athlete's own cell, for an approved coach's Call / Text. Asked only of somebody else's
+     profile; the server answers approved coaches and nobody else. */
+  const [cell, setCell] = useState<string | null>(null)
+  /* College Interest: which programs viewed the profile. The family's own view only. */
+  const [interest, setInterest] = useState<CollegeInterest | null>(null)
+  useEffect(() => {
+    if (standing !== "mine") return
+    let cancelled = false
+    void supabase.auth
+      .getSession()
+      .then(({ data }) => fetchCollegeInterest(String(id), data.session?.access_token ?? null))
+      .then((r) => !cancelled && setInterest(r))
+    return () => {
+      cancelled = true
+    }
+  }, [id, standing])
+
+  // Whether this viewer may message the athlete (approved coaches): decides the Contact row.
+  const [messageGate, setMessageGate] = useState(false)
+  useEffect(() => {
+    if (standing !== "other") return
+    let cancelled = false
+    void fetchEligibility(String(id)).then((g) => !cancelled && setMessageGate(Boolean(g.show)))
+    return () => {
+      cancelled = true
+    }
+  }, [id, standing])
+  const [academics, setAcademics] = useState<Academics | null>(null)
+  useEffect(() => {
+    if (standing === "signed-out") return
+    let cancelled = false
+    void supabase.auth
+      .getSession()
+      .then(({ data }) => fetchPrivateDetails(String(id), data.session?.access_token ?? null))
+      .then((d) => {
+        if (cancelled || !d) return
+        // Call / Text is for somebody else's profile; academics show to anyone the server answers.
+        if (standing === "other") setCell(d.cell)
+        setAcademics(d.academics)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [id, standing])
+
   const claim = (as: "self" | "parent") => {
     setClaiming(true)
     void claimAthleteProfile(String(id), as)
@@ -307,14 +681,42 @@ export default function AthleteProfileScreen() {
   }, [load])
 
   const weight = athlete ? weightLines(athlete) : { headline: null, note: null }
+  const isGirl = String(athlete?.gender ?? "").toLowerCase() === "female"
+  const styles_ = athlete?.banner?.competition.styles ?? []
+  const styleChip =
+    styles_.includes("freestyle") && styles_.includes("folkstyle")
+      ? "Freestyle + Folkstyle"
+      : styles_.includes("folkstyle")
+        ? "Folkstyle only"
+        : styles_.includes("freestyle")
+          ? "Freestyle only"
+          : null
 
   return (
     <SafeAreaView style={styles.screen} edges={["top"]}>
       <View style={styles.navBar}>
-        <Pressable onPress={() => router.back()} hitSlop={12} style={styles.back}>
+        <Pressable
+          // Opened from a link or an alert there is nothing to go back to; land on Athletes instead.
+          onPress={() => (router.canGoBack() ? router.back() : router.replace("/athletes"))}
+          hitSlop={12}
+          style={styles.back}
+        >
           <Ionicons name="chevron-back" size={22} color={colors.gold} />
           <Text style={styles.backText}>Back</Text>
         </Pressable>
+        {athlete && hasV2(athlete) && standing !== "mine" ? (
+          <Pressable
+            onPress={toggleFollow}
+            disabled={followBusy}
+            hitSlop={12}
+            style={[styles.bell, following && styles.bellOn]}
+            accessibilityRole="button"
+            accessibilityLabel={following ? "Following: result alerts on" : "Follow for result alerts"}
+          >
+            <Ionicons name={following ? "notifications" : "notifications-outline"} size={18} color={following ? colors.ink : colors.gold} />
+            <Text style={[styles.bellText, following && styles.bellTextOn]}>{following ? "Following" : "Follow"}</Text>
+          </Pressable>
+        ) : null}
       </View>
 
       {loading ? (
@@ -344,180 +746,188 @@ export default function AthleteProfileScreen() {
         >
           {hasV2(athlete) ? (
             <>
-              {/* Banner, as on the website (Matt's mock, 1 Oct 2026): photo, eyebrow, the name in
-                  two weights, the gold ribbon, the stat row, a card per key finish, Competes. */}
-              <View style={styles.bannerPhotoWrap}>
+              {/* The redesigned profile (Matt's mock, 8 Oct 2026): a compact header, Class of and Last
+                  competed, the coach's Message and Call / Text, the key finishes, then an overview
+                  of rows - Tournament Results collapsed until tapped. */}
+              <View style={styles.header}>
                 {athlete.photoUrl ? (
-                  <Image
-                    source={{ uri: athlete.photoUrl }}
-                    style={styles.bannerPhoto}
-                    contentFit="cover"
-                    contentPosition="top"
-                    transition={180}
-                  />
+                  <Image source={{ uri: athlete.photoUrl }} style={styles.headerPhoto} contentFit="cover" contentPosition="top" transition={180} />
                 ) : (
-                  <View style={[styles.bannerPhoto, styles.photoEmpty]}>
+                  <View style={[styles.headerPhoto, styles.photoEmpty]}>
                     <Text style={styles.initials}>{initials(athlete.name || String(name ?? ""))}</Text>
                   </View>
                 )}
-                {/* A fade into the page without a gradient module (a native change): stacked bands. */}
-                <View pointerEvents="none" style={styles.fade}>
-                  {Array.from({ length: 16 }, (_, i) => ((i + 1) / 16) ** 1.6).map((o) => (
-                    <View key={o} style={[styles.fadeBand, { opacity: o }]} />
-                  ))}
-                </View>
-              </View>
-
-              <View style={styles.identity}>
-                <Text style={styles.eyebrow}>NORTH CAROLINA WRESTLING</Text>
-                {(() => {
-                  const { first, last } = splitName(athlete.name || String(name ?? ""))
-                  return (
-                    <View>
-                      {first ? (
-                        <Text style={styles.firstName} maxFontSizeMultiplier={1.2}>
-                          {first.toUpperCase()}
+                <View style={[styles.flex, styles.headerText]}>
+                  <Text style={styles.eyebrow}>NC WRESTLING</Text>
+                  {(() => {
+                    const { first, last } = splitName(athlete.name || String(name ?? ""))
+                    return (
+                      <View>
+                        {first ? <Text style={styles.firstName} maxFontSizeMultiplier={1.2}>{first.toUpperCase()}</Text> : null}
+                        <Text style={styles.lastName} numberOfLines={2} adjustsFontSizeToFit maxFontSizeMultiplier={1.2}>
+                          {last.toUpperCase()}
                         </Text>
-                      ) : null}
-                      <Text style={styles.lastName} maxFontSizeMultiplier={1.2}>
-                        {last.toUpperCase()}
+                      </View>
+                    )
+                  })()}
+                  {[athlete.highSchool, athlete.club].filter(Boolean).length ? (
+                    <Text style={styles.meta} numberOfLines={2}>{[athlete.highSchool, athlete.club].filter(Boolean).join(" · ")}</Text>
+                  ) : null}
+                  {athlete.commitment ? (
+                    <View style={styles.commitLine}>
+                      {collegeLogo ? (
+                        <View style={styles.collegeLogoWrap}>
+                          <Image source={{ uri: collegeLogo }} style={styles.collegeLogo} contentFit="contain" transition={150} />
+                        </View>
+                      ) : (
+                        <Ionicons name="school" size={16} color={colors.gold} />
+                      )}
+                      <Text style={styles.commitLineText} numberOfLines={2}>
+                        <Text style={styles.commitLineLabel}>Committed to </Text>
+                        {athlete.commitment.college}
                       </Text>
                     </View>
-                  )
-                })()}
-                {athlete.prospectRanking || athlete.graduationYear ? (
-                  <View style={styles.ribbon}>
-                    <Text style={styles.ribbonText}>
-                      {[
-                        athlete.prospectRanking ? `RECRUITNC #${athlete.prospectRanking}` : null,
-                        athlete.graduationYear ? `CLASS OF ${athlete.graduationYear}` : null,
-                      ]
-                        .filter(Boolean)
-                        .join("  ·  ")}
-                    </Text>
-                  </View>
-                ) : null}
-                {[athlete.highSchool, athlete.club].filter(Boolean).length ? (
-                  <Text style={styles.meta}>{[athlete.highSchool, athlete.club].filter(Boolean).join(" · ")}</Text>
-                ) : null}
-
-                <View style={styles.stats}>
-                  <View style={styles.stat}>
-                    <Text style={styles.statLabel}>YEAR</Text>
-                    <Text style={styles.statValue}>{athlete.graduationYear ?? "—"}</Text>
-                  </View>
-                  {/* Last competed only: the listed weight is a number the family typed once, and the
-                      weight a wrestler actually made - where and when - is what a coach reads. */}
-                  <View style={[styles.stat, styles.statDivided, styles.flex]}>
-                    <Text style={styles.statLabel}>LAST COMPETED</Text>
-                    {athlete.weight.lastCompeted?.weight ? (
-                      <>
-                        <Text style={styles.statValueSmall}>{athlete.weight.lastCompeted.weight} lbs</Text>
-                        <Text style={styles.statSub} numberOfLines={2}>
-                          {[athlete.weight.lastCompeted.event, athlete.weight.lastCompeted.year].filter(Boolean).join(" ")}
-                        </Text>
-                      </>
-                    ) : (
-                      <Text style={styles.statSub}>No results on file yet</Text>
-                    )}
-                  </View>
+                  ) : null}
+                  {athlete.prospectRanking ? (
+                    <View style={styles.ribbon}>
+                      <Text style={styles.ribbonText}>RECRUITNC #{athlete.prospectRanking}</Text>
+                    </View>
+                  ) : null}
                 </View>
               </View>
 
-              {standing === "mine" ? null : (
-                <Pressable
-                  style={[styles.followButton, following && styles.followButtonOn]}
-                  onPress={toggleFollow}
-                  disabled={followBusy}
-                >
-                  <Ionicons
-                    name={following ? "notifications" : "notifications-outline"}
-                    size={16}
-                    color={following ? colors.ink : colors.text}
-                  />
-                  <Text style={[styles.followText, following && styles.followTextOn]}>
-                    {following ? "FOLLOWING" : "FOLLOW FOR RESULT ALERTS"}
-                  </Text>
-                </Pressable>
-              )}
-
-              {scoutingReport ? (
-                <Pressable
-                  style={styles.ownerAction}
-                  onPress={() => router.push({ pathname: "/scouting-report/[id]", params: { id: String(id) } })}
-                >
-                  <Ionicons name="document-text" size={16} color={colors.ink} />
-                  <Text style={styles.ownerActionText}>VIEW SCOUTING REPORT</Text>
-                </Pressable>
+              {athlete.nationalRanking || isGirl ? (
+                <View style={styles.chips}>
+                  {athlete.nationalRanking ? (
+                    <View style={styles.nationalRibbon}>
+                      <Text style={styles.nationalRibbonText}>
+                        <Text style={styles.nationalRibbonLabel}>★ NATIONAL  </Text>
+                        {athlete.nationalRanking.toUpperCase()}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {isGirl && styleChip ? (
+                    <View style={styles.styleChip}>
+                      <Text style={styles.styleChipText}>{styleChip.toUpperCase()}</Text>
+                    </View>
+                  ) : null}
+                </View>
               ) : null}
 
-              {/* Messages from college coaches live on the wrestler's own screen, for the family. */}
-              {standing === "mine" ? <CoachMessagesCard athleteId={String(id)} /> : null}
-              {/* College coaches: renders nothing for anyone else. */}
-              {standing === "other" ? <CoachMessageAction athleteId={String(id)} athleteName={athlete.name} /> : null}
+              <View style={styles.statsCard}>
+                <View style={styles.statCell}>
+                  <Text style={styles.statLabel}>CLASS OF</Text>
+                  <Text style={styles.statValue}>{athlete.graduationYear ?? "—"}</Text>
+                </View>
+                <View style={[styles.statCell, styles.statCellDivided, styles.flex]}>
+                  <Text style={styles.statLabel}>LAST COMPETED</Text>
+                  {athlete.weight.lastCompeted?.weight ? (
+                    <>
+                      <Text style={styles.statValue}>{athlete.weight.lastCompeted.weight} lbs</Text>
+                      <Text style={styles.statSub} numberOfLines={2}>
+                        {[athlete.weight.lastCompeted.event, athlete.weight.lastCompeted.year].filter(Boolean).join(" · ")}
+                      </Text>
+                    </>
+                  ) : (
+                    <Text style={styles.statSub}>No results on file yet</Text>
+                  )}
+                </View>
+              </View>
 
+              {standing === "mine" ? <CoachMessagesCard athleteId={String(id)} /> : null}
               {standing === "mine" ? (
-                // Matt: if someone owns the profile, make it obvious they can edit it.
                 <View style={styles.ownerBar}>
                   <View style={styles.flex}>
                     <Text style={styles.ownerTitle}>This is your profile</Text>
                     <Text style={styles.ownerBody}>College coaches read this page. Keep your weight, film and GPA current.</Text>
                   </View>
-                  <Pressable
-                    style={styles.ownerEdit}
-                    onPress={() => router.push({ pathname: "/athlete-edit", params: { id: String(id), name: athlete.name } })}
-                  >
+                  <Pressable style={styles.ownerEdit} onPress={() => router.push({ pathname: "/athlete-edit", params: { id: String(id), name: athlete.name } })}>
                     <Ionicons name="create" size={16} color={colors.ink} />
                     <Text style={styles.ownerActionText}>Edit</Text>
                   </Pressable>
                 </View>
               ) : null}
 
-              {athlete.commitment ? (
-                <View style={styles.commit}>
-                  <Ionicons name="school" size={18} color={colors.gold} />
-                  <View style={styles.flex}>
-                    <Text style={styles.commitCollege}>{athlete.commitment.college}</Text>
-                    <Text style={styles.commitStatus}>{athlete.commitment.status ?? "Committed"}</Text>
+              {/* One list of rows, each opening in place (Matt's mock, 8 Oct 2026). Key finishes lead
+                  Tournament Results' summary line; contact is a row, for coaches only. */}
+              <View style={styles.list}>
+              <TournamentResults athlete={athlete} isGirl={isGirl} />
+              <OverviewRow
+                icon="stats-chart"
+                title="Significant Wins"
+                subtitle={significantWinsLine(wins) ?? "None on file yet"}
+              >
+                {wins.length ? <BoutList bouts={wins} /> : null}
+              </OverviewRow>
+              <OverviewRow
+                icon="trending-down"
+                title="Notable Losses"
+                subtitle={
+                  losses.length
+                    ? `${losses.length} to ranked, All-American or state-placing opponents`
+                    : "None to ranked or state-placing opponents on file"
+                }
+              >
+                {losses.length ? <BoutList bouts={losses} /> : null}
+              </OverviewRow>
+              <OverviewRow
+                icon="school-outline"
+                title="Academic Information"
+                subtitle={academicsLine(academics)}
+              >
+                {academics && hasAcademics(academics) ? <AcademicsBody academics={academics} /> : null}
+              </OverviewRow>
+              {previewCoach || (standing === "other" && (cell || messageGate)) ? (
+                <OverviewRow
+                  icon="call-outline"
+                  title="Contact Information"
+                  subtitle={previewCoach || cell ? "Message, call or text the athlete" : "Message the athlete"}
+                >
+                  <View style={styles.winList}>
+                    {previewCoach ? (
+                      <Pressable style={styles.contactButton} onPress={() => Alert.alert("Preview", "Opens a message to the athlete.")}>
+                        <Ionicons name="mail-outline" size={16} color={colors.ink} />
+                        <Text style={styles.contactButtonText}>MESSAGE {splitName(athlete.name).first.toUpperCase()}</Text>
+                      </Pressable>
+                    ) : (
+                      <CoachMessageAction athleteId={String(id)} athleteName={athlete.name} />
+                    )}
+                    {previewCoach || cell ? (
+                      <Pressable
+                        style={styles.callButton}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Call or text ${athlete.name}`}
+                        onPress={() =>
+                          previewCoach || !cell
+                            ? Alert.alert(athlete.name, "Athlete's cell (preview)", [{ text: "Call" }, { text: "Text" }, { text: "Cancel", style: "cancel" }])
+                            : Alert.alert(athlete.name, cell, [
+                                { text: "Call", onPress: () => void Linking.openURL(`tel:${cell.replace(/[^\d+]/g, "")}`) },
+                                { text: "Text", onPress: () => void Linking.openURL(`sms:${cell.replace(/[^\d+]/g, "")}`) },
+                                { text: "Cancel", style: "cancel" },
+                              ])
+                        }
+                      >
+                        <Ionicons name="call" size={16} color={colors.gold} />
+                        <Text style={styles.callText}>CALL / TEXT  ·  ATHLETE'S CELL</Text>
+                      </Pressable>
+                    ) : null}
                   </View>
-                </View>
+                </OverviewRow>
               ) : null}
-
-              <CredentialCards credentials={athlete.banner!.credentials} />
-              <CompetesBar competition={athlete.banner!.competition} />
-
-              {/* In-state first - the Tournament of Champions, then NCHSAA States - then national
-                  folkstyle, and Freestyle & Greco-Roman last, as on the website. */}
-              {athlete.tocRows?.length ? (
-                <Section title="TOURNAMENT OF CHAMPIONS">
-                  {athlete.tocRows.map((row) => (
-                    <TournamentRow key={row.id} row={row} />
-                  ))}
-                </Section>
+              {standing === "mine" ? (
+                <OverviewRow icon="eye-outline" title="College Interest" subtitle={collegeInterestLine(interest)}>
+                  {interest ? <CollegeInterestBody interest={interest} /> : null}
+                </OverviewRow>
               ) : null}
-              {athlete.stateRows?.length ? (
-                <Section title="NCHSAA STATE CHAMPIONSHIPS">
-                  {athlete.stateRows.map((row) => (
-                    <TournamentRow key={row.id} row={row} />
-                  ))}
-                </Section>
+              {scoutingReport ? (
+                <OverviewRow
+                  icon="document-text-outline"
+                  title="Scouting Report"
+                  subtitle="Evaluation, record and competition, in full"
+                  onPress={() => router.push({ pathname: "/scouting-report/[id]", params: { id: String(id) } })}
+                />
               ) : null}
-              {athlete.folkstyle?.length ? (
-                <Section title="NATIONAL TOURNAMENTS — FOLKSTYLE">
-                  <RowList rows={athlete.folkstyle} dualsLabel="DUALS & TEAM EVENTS" />
-                </Section>
-              ) : null}
-              {athlete.olympic?.length ? (
-                <>
-                  <View style={styles.styleDivider}>
-                    <Text style={styles.styleDividerTitle}>OLYMPIC STYLES</Text>
-                    <Text style={styles.styleDividerNote}>Freestyle & Greco-Roman — not folkstyle</Text>
-                  </View>
-                  <Section title="FREESTYLE & GRECO-ROMAN">
-                    <RowList rows={athlete.olympic} dualsLabel="DUAL RESULTS" />
-                  </Section>
-                </>
-              ) : null}
+              </View>
 
               {(standing === "other" || standing === "signed-out") && !scoutingReport ? (
                 <View style={styles.claimCard}>
@@ -725,7 +1135,17 @@ const styles = StyleSheet.create({
   },
   retryText: { ...type.label, color: colors.gold },
 
-  navBar: { paddingHorizontal: space.md, paddingVertical: space.sm },
+  navBar: { paddingHorizontal: space.md, paddingVertical: space.sm, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  bell: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: space.sm, minHeight: 32, borderRadius: 999, borderWidth: 1, borderColor: "rgba(211,181,116,0.6)" },
+  bellOn: { backgroundColor: colors.gold, borderColor: colors.gold },
+  bellText: { fontSize: 12, fontWeight: "800", color: colors.gold },
+  bellTextOn: { color: colors.ink },
+  commitLine: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 },
+  commitLineText: { flex: 1, fontSize: 13, fontWeight: "800", color: colors.text },
+  commitLineLabel: { fontWeight: "500", color: colors.textSecondary },
+  list: { gap: space.sm },
+  contactButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: space.sm, backgroundColor: colors.gold, borderRadius: radius.md, paddingVertical: space.md },
+  contactButtonText: { fontSize: 13, fontWeight: "800", color: colors.ink },
   back: { flexDirection: "row", alignItems: "center" },
   backText: { ...type.label, color: colors.gold },
 
@@ -736,8 +1156,57 @@ const styles = StyleSheet.create({
   fadeBand: { flex: 1, backgroundColor: colors.ink },
   identity: { gap: space.sm, marginTop: -space.md },
   eyebrow: { fontSize: 10, fontWeight: "700", letterSpacing: 4, color: colors.gold },
-  firstName: { fontSize: 32, fontWeight: "600", color: colors.text, opacity: 0.92, letterSpacing: -0.5, lineHeight: 34 },
-  lastName: { fontSize: 44, fontWeight: "900", color: colors.text, letterSpacing: -1, lineHeight: 46 },
+  firstName: { fontSize: 22, fontWeight: "500", color: colors.text, opacity: 0.88, letterSpacing: -0.3, lineHeight: 24 },
+  lastName: { fontSize: 32, fontWeight: "900", color: colors.text, letterSpacing: -0.8, lineHeight: 34 },
+  header: { flexDirection: "row", gap: space.md, alignItems: "center" },
+  headerPhoto: { width: 124, height: 156, borderRadius: radius.md, backgroundColor: colors.surface },
+  headerText: { gap: 2 },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: space.sm },
+  nationalRibbon: { borderWidth: 1, borderColor: colors.gold, borderRadius: 6, paddingHorizontal: space.sm, paddingVertical: 6, backgroundColor: colors.ink },
+  nationalRibbonText: { fontSize: 11, fontWeight: "800", letterSpacing: 1.2, color: colors.text },
+  nationalRibbonLabel: { color: colors.gold },
+  styleChip: { borderWidth: 1, borderColor: "rgba(110,231,183,0.6)", borderRadius: 6, paddingHorizontal: space.sm, paddingVertical: 6 },
+  styleChipText: { fontSize: 11, fontWeight: "800", letterSpacing: 1.2, color: "#A7F3D0" },
+  collegeLogoWrap: { width: 28, height: 28, borderRadius: 14, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  collegeLogo: { width: 22, height: 22 },
+  commitLabel: { fontSize: 9, fontWeight: "700", letterSpacing: 2, color: colors.textSecondary },
+  statsCard: { flexDirection: "row", borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.surface },
+  statCell: { padding: space.md },
+  statCellDivided: { borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: colors.line },
+  coachActions: { flexDirection: "row", gap: space.sm, alignItems: "stretch" },
+  callButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1, borderColor: colors.gold, borderRadius: radius.md, paddingHorizontal: space.md, minHeight: 48 },
+  callText: { ...type.label, color: colors.text, fontWeight: "800" },
+  sectionLabel: { fontSize: 10, fontWeight: "800", letterSpacing: 3, color: colors.gold, marginTop: space.sm },
+  ovCard: { borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.surface, overflow: "hidden" },
+  ovCardGold: { borderColor: "rgba(211,181,116,0.5)" },
+  ovHead: { flexDirection: "row", alignItems: "center", gap: space.md, paddingHorizontal: space.md, paddingVertical: space.sm, minHeight: 60 },
+  ovHeadInner: { flexDirection: "row", alignItems: "center", gap: space.md },
+  ovTitle: { fontSize: 15, fontWeight: "800", color: colors.text },
+  ovSubtitle: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  ovBody: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line, padding: space.md },
+  toggle: { flexDirection: "row", borderWidth: 1, borderColor: "rgba(211,181,116,0.6)", borderRadius: radius.sm, overflow: "hidden" },
+  toggleButton: { paddingHorizontal: space.sm, minHeight: 36, justifyContent: "center" },
+  toggleOn: { backgroundColor: colors.gold },
+  toggleText: { fontSize: 12, fontWeight: "800", color: colors.text },
+  toggleTextOn: { color: colors.ink },
+  styleLabel: { fontSize: 10, fontWeight: "800", letterSpacing: 2.4, paddingHorizontal: space.md, paddingTop: space.md },
+  styleFree: { color: "#A7F3D0" },
+  styleFolk: { color: "#93C5FD" },
+  groupName: { fontSize: 13, fontWeight: "900", color: colors.text, paddingHorizontal: space.md, paddingTop: space.md, paddingBottom: 2 },
+  seeAll: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", margin: space.md, paddingHorizontal: space.md, minHeight: 44, borderWidth: 1, borderColor: "rgba(211,181,116,0.5)", borderRadius: radius.sm },
+  seeAllText: { ...type.label, color: colors.gold, fontWeight: "800" },
+  winList: { gap: space.sm },
+  winRow: { gap: 2 },
+  winOpponent: { fontSize: 14, fontWeight: "800", color: colors.text },
+  winDetail: { fontSize: 12, color: colors.textSecondary },
+  winSchool: { fontSize: 12, fontWeight: "500", color: colors.textMuted },
+  winAccolade: { fontSize: 12, fontWeight: "700", color: colors.gold },
+  toggleStart: { alignSelf: "flex-start" },
+  acadTiles: { flexDirection: "row", gap: space.sm },
+  acadTile: { flex: 1, borderWidth: 1, borderColor: "rgba(211,181,116,0.35)", borderRadius: radius.sm, padding: space.sm },
+  acadLabel: { fontSize: 10, fontWeight: "800", letterSpacing: 1.6, color: colors.textMuted },
+  acadValue: { fontSize: 22, fontWeight: "900", color: colors.text, marginTop: 2 },
+  acadNote: { fontSize: 11, color: colors.textMuted },
   ribbon: {
     alignSelf: "flex-start",
     backgroundColor: colors.gold,

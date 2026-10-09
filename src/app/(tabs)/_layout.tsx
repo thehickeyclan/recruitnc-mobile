@@ -1,14 +1,18 @@
 import { View, Pressable, Text, StyleSheet } from "react-native"
-import { Tabs, router } from "expo-router"
+import { Tabs, router, usePathname } from "expo-router"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors } from "@/theme/tokens"
 import { AlertsPrimer } from "@/components/alerts-primer"
 import { DataDawgAvatar } from "@/components/data-dawg-avatar"
 
 export default function TabsLayout() {
+  // Not on a profile: the button sat over the profile's rows (Matt, 8 Oct 2026).
+  const onProfile = usePathname().startsWith("/athlete/")
   return (
     <View style={styles.root}>
     <Tabs
+      // "history": Back from an athlete returns to the tab it was opened from.
+      backBehavior="history"
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.gold,
@@ -69,6 +73,9 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, size }) => <Ionicons name="calendar" size={size} color={color} />,
         }}
       />
+      {/* The athlete profile lives inside the tabs, hidden from the bar, so the bottom menu stays
+          on screen there (Matt, 8 Oct 2026). Its path is unchanged: /athlete/<id>. */}
+      <Tabs.Screen name="athlete/[id]" options={{ href: null }} />
       <Tabs.Screen
         name="more"
         options={{
@@ -82,10 +89,12 @@ export default function TabsLayout() {
       <AlertsPrimer />
 
       {/* Floating Data Dawg launcher — mirrors the website, and keeps the tab bar to five slots. */}
-      <Pressable style={styles.fab} onPress={() => router.push("/ask")} accessibilityLabel="Ask Data Dawg">
-        <DataDawgAvatar size={28} />
-        <Text style={styles.fabText}>Data Dawg</Text>
-      </Pressable>
+      {onProfile ? null : (
+        <Pressable style={styles.fab} onPress={() => router.push("/ask")} accessibilityLabel="Ask Data Dawg">
+          <DataDawgAvatar size={28} />
+          <Text style={styles.fabText}>Data Dawg</Text>
+        </Pressable>
+      )}
     </View>
   )
 }

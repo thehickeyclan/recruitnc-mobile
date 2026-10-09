@@ -18,7 +18,7 @@ import { openWebPage } from "@/lib/profile-link"
  */
 type CardState = { kind: "create" } | { kind: "complete"; athlete: LinkedAthlete; field: MissingField } | null
 
-export function CreateProfileCard() {
+export function CreateProfileCard({ withClaim = false }: { withClaim?: boolean } = {}) {
   const [state, setState] = useState<CardState>(null)
 
   useFocusEffect(
@@ -32,6 +32,30 @@ export function CreateProfileCard() {
   )
 
   if (!state) return null
+  if (state.kind === "create" && withClaim) {
+    /*
+     * Athletes tab: "Create" and "Claim" side by side (Matt, 8 Oct 2026). Most NC wrestlers are
+     * already on file from their results, and a family looking at that list thinks "claim", not
+     * "create". Both open the same flow: it finds the existing profile and offers to claim it.
+     */
+    const open = () => router.push("/create-profile" as never)
+    return (
+      <View style={styles.pair}>
+        <Pressable style={({ pressed }) => [styles.pairButton, pressed && styles.pressed]} onPress={open} accessibilityRole="button">
+          <Ionicons name="person-add" size={18} color={colors.ink} />
+          <Text style={styles.pairText}>Create your profile</Text>
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [styles.pairButton, styles.pairSecondary, pressed && styles.pressed]}
+          onPress={open}
+          accessibilityRole="button"
+        >
+          <Ionicons name="checkmark-circle" size={18} color={colors.gold} />
+          <Text style={[styles.pairText, styles.pairTextSecondary]}>Claim your profile</Text>
+        </Pressable>
+      </View>
+    )
+  }
   if (state.kind === "create") {
     return (
       <Card
@@ -123,6 +147,21 @@ const styles = StyleSheet.create({
     backgroundColor: colors.gold,
   },
   pressed: { opacity: 0.85 },
+  pair: { flexDirection: "row", gap: space.sm },
+  pairButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    minHeight: 48,
+    borderRadius: radius.lg,
+    backgroundColor: colors.gold,
+    paddingHorizontal: space.sm,
+  },
+  pairSecondary: { backgroundColor: "transparent", borderWidth: 1, borderColor: colors.gold },
+  pairText: { fontSize: 14, fontWeight: "800", color: colors.ink },
+  pairTextSecondary: { color: colors.gold },
   icon: {
     width: 40,
     height: 40,

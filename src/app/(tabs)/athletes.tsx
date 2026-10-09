@@ -132,7 +132,7 @@ export default function AthletesScreen() {
         {!loading && !error && rows.length === 0 && (
           <Text style={styles.empty}>No wrestlers match that. Try fewer filters.</Text>
         )}
-        <CreateProfileCard />
+        <CreateProfileCard withClaim />
         {rows.map((a) => (
           <Pressable key={a.id} style={styles.card} onPress={() => router.push(`/athlete/${a.id}`)}>
             <View style={styles.cardBody}>
