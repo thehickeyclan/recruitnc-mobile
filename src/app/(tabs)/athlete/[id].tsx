@@ -60,7 +60,7 @@ function initials(name: string): string {
 
 /** "Junior Girls Freestyle" out of "… Championships - Junior Girls Freestyle", or "" when none. */
 function divisionOf(event: string): string {
-  const parts = event.split(/\s+[-·]\s+/)
+  const parts = event.split(/\s+[-–—·]\s+/)
   return parts.length > 1 ? parts[parts.length - 1]!.trim() : ""
 }
 
@@ -591,13 +591,19 @@ export default function AthleteProfileScreen() {
 
   const [wins, setWins] = useState<SignificantWin[]>([])
   const [losses, setLosses] = useState<SignificantWin[]>([])
+  /* Coaches and the family only; the server says which this viewer is. */
+  const [lossesVisible, setLossesVisible] = useState(false)
   useEffect(() => {
     let cancelled = false
-    void fetchSignificantWins(String(id)).then((r) => {
-      if (cancelled) return
-      setWins(r.wins)
-      setLosses(r.losses)
-    })
+    void supabase.auth
+      .getSession()
+      .then(({ data }) => fetchSignificantWins(String(id), data.session?.access_token ?? null))
+      .then((r) => {
+        if (cancelled) return
+        setWins(r.wins)
+        setLosses(r.losses)
+        setLossesVisible(r.lossesVisible)
+      })
     return () => {
       cancelled = true
     }
@@ -859,17 +865,19 @@ export default function AthleteProfileScreen() {
               >
                 {wins.length ? <BoutList bouts={wins} /> : null}
               </OverviewRow>
-              <OverviewRow
-                icon="trending-down"
-                title="Notable Losses"
-                subtitle={
-                  losses.length
-                    ? `${losses.length} to ranked, All-American or state-placing opponents`
-                    : "None to ranked or state-placing opponents on file"
-                }
-              >
-                {losses.length ? <BoutList bouts={losses} /> : null}
-              </OverviewRow>
+{lossesVisible ? (
+                <OverviewRow
+                  icon="trending-down"
+                  title="Notable Losses"
+                  subtitle={
+                    losses.length
+                      ? `${losses.length} to ranked, All-American or state-placing opponents`
+                      : "None to ranked or state-placing opponents on file"
+                  }
+                >
+                  {losses.length ? <BoutList bouts={losses} /> : null}
+                </OverviewRow>
+              ) : null}
               <OverviewRow
                 icon="school-outline"
                 title="Academic Information"

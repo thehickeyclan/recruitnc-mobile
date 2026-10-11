@@ -160,9 +160,22 @@ export function weightLines(athlete: AthleteProfile): { headline: string | null;
   return { headline, note: `Last competed at ${last.weight} lbs${where ? ` · ${where}` : ""}` }
 }
 
+/**
+ * "132 lbs" or "57 kg". USA Wrestling's freestyle and Greco events record kilos and the number
+ * arrives as it was stored; nobody in high school wrestles under 95 lbs, so a number below that
+ * is kilos. Same rule as the website's lib/profile/weight-label.ts.
+ */
+export function weightLabel(weight: string | number | null | undefined): string | null {
+  const text = String(weight ?? "").trim()
+  if (!text) return null
+  if (/[a-z]/i.test(text)) return text
+  const n = Number(text)
+  return Number.isFinite(n) && n > 0 && n < 95 ? `${text} kg` : `${text} lbs`
+}
+
 /** "2nd · 1-1" — the finish first, because that is what anyone is looking for. */
 export function rowSummary(row: ProfileTournamentRow): string | null {
-  return [row.placement, row.record, row.weight ? `${row.weight} lbs` : null].filter(Boolean).join(" · ") || null
+  return [row.placement, row.record, weightLabel(row.weight)].filter(Boolean).join(" · ") || null
 }
 
 /** A win over somebody with an accolade, as the website's Significant Wins lists it. */
@@ -184,23 +197,32 @@ export type SignificantWin = {
 /**
  * The website's significant wins and notable losses for a wrestler - the scouting report's lists.
  * Empty on any failure: they are rows of the page.
+ *
+ * Losses are for college coaches and the wrestler's own family (Matt, 11 October 2026: families
+ * look at each other's losses), and the server decides which this is - so the token goes along,
+ * and `lossesVisible` false means withheld, not "none on file": do not draw the row.
  */
 export async function fetchSignificantWins(
   athleteId: string,
-): Promise<{ wins: SignificantWin[]; losses: SignificantWin[] }> {
-  if (!BASE) return { wins: [], losses: [] }
+  accessToken: string | null = null,
+): Promise<{ wins: SignificantWin[]; losses: SignificantWin[]; lossesVisible: boolean }> {
+  const none = { wins: [], losses: [], lossesVisible: false }
+  if (!BASE) return none
   try {
     const response = await fetch(`${BASE}/api/athletes/${encodeURIComponent(athleteId)}/significant-wins`, {
-      headers: clientHeader(),
+      headers: accessToken ? { ...clientHeader(), Authorization: `Bearer ${accessToken}` } : clientHeader(),
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     })
-    const body = (await response.json().catch(() => null)) as { wins?: SignificantWin[]; losses?: SignificantWin[] } | null
+    const body = (await response.json().catch(() => null)) as
+      | { wins?: SignificantWin[]; losses?: SignificantWin[]; lossesVisible?: boolean }
+      | null
     return {
       wins: Array.isArray(body?.wins) ? body!.wins : [],
       losses: Array.isArray(body?.losses) ? body!.losses : [],
+      lossesVisible: body?.lossesVisible === true,
     }
   } catch {
-    return { wins: [], losses: [] }
+    return none
   }
 }
 
