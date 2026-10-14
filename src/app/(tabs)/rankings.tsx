@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { CoachMessagingIntro } from "@/components/coach-messaging-intro"
 import {
   ActivityIndicator,
@@ -14,9 +14,18 @@ import { SafeAreaView } from "react-native-safe-area-context"
 import { router, useFocusEffect } from "expo-router"
 import * as WebBrowser from "expo-web-browser"
 import Ionicons from "@expo/vector-icons/Ionicons"
+import * as Notifications from "expo-notifications"
 
 import { colors, radius, space, type } from "@/theme/tokens"
-import { fetchRankings, type RankedAthlete, type RankingBoard, type RankingsResult } from "@/lib/rankings"
+import {
+  alertRankingGender,
+  boardGender,
+  fetchRankings,
+  type RankedAthlete,
+  type RankingBoard,
+  type RankingGender,
+  type RankingsResult,
+} from "@/lib/rankings"
 
 /**
  * The rankings, drawn on the phone rather than borrowed from the website.
@@ -39,14 +48,42 @@ export default function RankingsScreen() {
   const [result, setResult] = useState<RankingsResult | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [activeKey, setActiveKey] = useState<string | null>(null)
+  /*
+   * Men's or women's (14 October 2026). The two lists share class years, so they are two sets of
+   * tabs behind one switch rather than one row of six. Null until the first load picks: the
+   * server's default (a women's coach starts on the women's), or an alert that named a list.
+   */
+  const [gender, setGender] = useState<RankingGender | null>(null)
+  const genderRef = useRef<RankingGender | null>(null)
+  genderRef.current = gender
+
+  // "Women's rankings are out" opens this tab; it should open on the women's.
+  const response = Notifications.useLastNotificationResponse()
+  const handledAlert = useRef<string | null>(null)
+  useEffect(() => {
+    if (!response) return
+    const id = response.notification.request.identifier
+    if (handledAlert.current === id) return
+    handledAlert.current = id
+    const fromAlert = alertRankingGender(response.notification.request.content.data)
+    if (fromAlert) {
+      setGender(fromAlert)
+      setActiveKey(null)
+    }
+  }, [response])
 
   const load = useCallback(async () => {
     const next = await fetchRankings()
     setResult(next)
     if (next.state === "ok") {
+      const hasWomens = next.boards.some((b) => boardGender(b) === "Female")
+      const chosen = genderRef.current ?? next.defaultGender
+      const g: RankingGender = chosen === "Female" && hasWomens ? "Female" : "Male"
+      setGender(g)
+      const inList = next.boards.filter((b) => boardGender(b) === g)
       // Keep the board they were reading across a refresh; otherwise start at the first.
       setActiveKey((current) =>
-        current && next.boards.some((b) => b.key === current) ? current : (next.boards[0]?.key ?? null),
+        current && inList.some((b) => b.key === current) ? current : (inList[0]?.key ?? null),
       )
     }
   }, [])
@@ -70,10 +107,19 @@ export default function RankingsScreen() {
     setRefreshing(false)
   }, [load])
 
-  const board: RankingBoard | null = useMemo(() => {
-    if (!result || result.state !== "ok") return null
-    return result.boards.find((b) => b.key === activeKey) ?? result.boards[0] ?? null
-  }, [result, activeKey])
+  const visible: RankingBoard[] = useMemo(() => {
+    if (!result || result.state !== "ok") return []
+    const g = gender ?? "Male"
+    const list = result.boards.filter((b) => boardGender(b) === g)
+    return list.length ? list : result.boards.filter((b) => boardGender(b) === "Male")
+  }, [result, gender])
+  const hasWomens = result?.state === "ok" && result.boards.some((b) => boardGender(b) === "Female")
+
+  const board: RankingBoard | null = useMemo(
+    () => visible.find((b) => b.key === activeKey) ?? visible[0] ?? null,
+    [visible, activeKey],
+  )
+  const womens = board ? boardGender(board) === "Female" : false
 
   if (!result) {
     return (
@@ -135,6 +181,30 @@ export default function RankingsScreen() {
 
       <CoachMessagingIntro />
 
+      {hasWomens ? (
+        <View style={styles.switch}>
+          {(["Male", "Female"] as const).map((g) => {
+            const active = (gender ?? "Male") === g
+            return (
+              <Pressable
+                key={g}
+                onPress={() => {
+                  setGender(g)
+                  setActiveKey(null)
+                }}
+                style={[styles.switchOption, active && styles.switchOptionActive]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+              >
+                <Text style={[styles.switchText, active && styles.switchTextActive]}>
+                  {g === "Female" ? "Women's" : "Men's"}
+                </Text>
+              </Pressable>
+            )
+          })}
+        </View>
+      ) : null}
+
       {/*
         * A plain row, not a horizontal ScrollView.
         *
@@ -143,7 +213,7 @@ export default function RankingsScreen() {
         * scroller bought nothing and cost the one thing that had to be right.
         */}
       <View style={styles.tabs}>
-        {result.boards.map((b) => {
+        {visible.map((b) => {
           const active = b.key === board?.key
           return (
             <Pressable
@@ -169,8 +239,9 @@ export default function RankingsScreen() {
         }
         ListFooterComponent={
           <Text style={styles.footnote}>
-            Ranked on results: who they wrestled, how they did against them, and what they have done
-            outside this state.
+            {womens
+              ? "Weighted heavily on freestyle, the style women wrestle in college: national events and wins over nationally ranked opponents count most, with folkstyle state results as support."
+              : "Ranked on results: who they wrestled, how they did against them, and what they have done outside this state."}
           </Text>
         }
       />
@@ -180,7 +251,8 @@ export default function RankingsScreen() {
 
 /** "Class of 2027" is too wide for a phone tab; beside the others the year alone reads fine. */
 function shortTitle(board: RankingBoard): string {
-  return /^\d{4}$/.test(board.key) ? board.key : `Top ${board.cap}`
+  const year = board.key.match(/^(?:women-)?(\d{4})$/)?.[1]
+  return year ?? `Top ${board.cap}`
 }
 
 function Row({ athlete }: { athlete: RankedAthlete }) {
@@ -289,6 +361,21 @@ const styles = StyleSheet.create({
    * explicit line height on the label and real breathing room underneath fixes both the
    * clipping and the crowding.
    */
+  switch: {
+    flexDirection: "row",
+    marginHorizontal: space.lg,
+    marginBottom: space.sm,
+    padding: 3,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface,
+  },
+  switchOption: { flex: 1, alignItems: "center", paddingVertical: 8, borderRadius: radius.pill },
+  switchOptionActive: { backgroundColor: colors.gold },
+  switchText: { ...type.label, lineHeight: 18, fontWeight: "700", color: colors.textSecondary },
+  switchTextActive: { color: colors.ink },
+
   tabs: {
     flexDirection: "row",
     flexWrap: "wrap",

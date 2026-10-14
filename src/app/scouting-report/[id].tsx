@@ -26,6 +26,7 @@ import {
   type ScoutingReport,
 } from "@/lib/scouting-report-format"
 import { keyFacts, snapshotFigures, starPart } from "@/lib/scouting-report-snapshot"
+import { rankLabel } from "@/lib/rank-label"
 
 /**
  * The scouting report, natively.
@@ -282,7 +283,7 @@ function Report({ report }: { report: ScoutingReport }) {
           ) : null}
           <Text style={styles.rankLine}>
             {[
-              report.rankingPublished && report.prospectRanking ? `RecruitNC #${report.prospectRanking}` : null,
+              report.rankingPublished && report.prospectRanking ? rankLabel(report.prospectRanking, identity.gender) : null,
               identity.graduationYear ? `Class of ${identity.graduationYear}` : null,
             ]
               .filter(Boolean)

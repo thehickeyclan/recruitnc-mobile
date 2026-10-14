@@ -46,6 +46,8 @@ export type ScoutingReport = {
     highSchool: string | null
     club: string | null
     graduationYear: number | null
+    /** Newer servers only. Decides whether the rank is the men's or the women's board. */
+    gender?: string | null
     weightClass: string | null
     lastCompetedWeight: string | null
     lastCompetedEvent: string | null

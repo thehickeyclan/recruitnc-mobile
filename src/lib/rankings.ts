@@ -37,15 +37,19 @@ export type RankedAthlete = {
   credentials: RankingCredential[]
 }
 
+export type RankingGender = "Male" | "Female"
+
 export type RankingBoard = {
   key: string
+  /** Absent on boards from servers older than the women's release: those are the men's. */
+  gender?: RankingGender
   title: string
   cap: number
   athletes: RankedAthlete[]
 }
 
 export type RankingsResult =
-  | { state: "ok"; boards: RankingBoard[] }
+  | { state: "ok"; boards: RankingBoard[]; defaultGender: RankingGender }
   | { state: "signed-out" }
   | { state: "locked"; message: string }
   | { state: "error"; message: string }
@@ -61,7 +65,7 @@ export async function fetchRankings(): Promise<RankingsResult> {
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
 
   try {
-    const response = await fetch(`${BASE.replace(/\/$/, "")}/api/mobile/v1/rankings`, {
+    const response = await fetch(`${BASE.replace(/\/$/, "")}/api/mobile/v1/rankings?women=1`, {
       headers: { ...clientHeader(), Authorization: `Bearer ${token}` },
       signal: controller.signal,
     })
@@ -80,10 +84,10 @@ export async function fetchRankings(): Promise<RankingsResult> {
       return { state: "error", message: `Could not load rankings (${response.status}).` }
     }
 
-    const body = (await response.json()) as { boards?: RankingBoard[] }
+    const body = (await response.json()) as { boards?: RankingBoard[]; defaultGender?: string }
     const boards = (body.boards ?? []).filter((b) => b && Array.isArray(b.athletes))
     if (boards.length === 0) return { state: "error", message: "No rankings published yet." }
-    return { state: "ok", boards }
+    return { state: "ok", boards, defaultGender: body.defaultGender === "Female" ? "Female" : "Male" }
   } catch (caught) {
     // A timeout and a dead network read the same to somebody holding a phone.
     const aborted = caught instanceof Error && caught.name === "AbortError"
@@ -94,4 +98,21 @@ export async function fetchRankings(): Promise<RankingsResult> {
   } finally {
     clearTimeout(timer)
   }
+}
+
+/** Whose board this is. A board with no gender came from a server that only had the men's. */
+export function boardGender(board: Pick<RankingBoard, "gender">): RankingGender {
+  return board.gender === "Female" ? "Female" : "Male"
+}
+
+/**
+ * Which list a rankings alert means, or null when it does not say.
+ *
+ * The women's release alert opens /rankings, the one rankings path every installed build has,
+ * and carries `gender` so a build that knows about the women's boards opens on them.
+ */
+export function alertRankingGender(data: unknown): RankingGender | null {
+  const d = data as { kind?: unknown; gender?: unknown } | null | undefined
+  if (d?.kind !== "rankings") return null
+  return /female|women|girls/i.test(String(d.gender ?? "")) ? "Female" : null
 }

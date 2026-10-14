@@ -49,6 +49,8 @@ export type AthleteProfile = {
   graduationYear: number | null
   /** Published classes only. An unpublished class has no number to show. */
   prospectRanking: number | null
+  /** A girl's rank on the women's board; `prospectRanking` is the men's. Newer servers only. */
+  womensRanking?: number | null
   /** "#6 SI (170) · #12 MatScouts (170)" - the national ranks held now. Newer servers only. */
   nationalRanking?: string | null
   gender?: string | null

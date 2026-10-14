@@ -14,6 +14,7 @@ import { openAthleteProfile, openWebPage } from "@/lib/profile-link"
 import { claimAthleteProfile, currentUserId, loadAthleteEdits } from "@/lib/athlete-edit"
 import { fetchFollowState, setFollowing } from "@/lib/follows"
 import { fetchScoutingAccess } from "@/lib/scouting-report"
+import { rankLabel } from "@/lib/rank-label"
 import {
   STYLE_LABEL,
   fetchPrivateDetails,
@@ -794,9 +795,14 @@ export default function AthleteProfileScreen() {
                       </Text>
                     </View>
                   ) : null}
-                  {athlete.prospectRanking ? (
+                  {athlete.prospectRanking || athlete.womensRanking ? (
                     <View style={styles.ribbon}>
-                      <Text style={styles.ribbonText}>RECRUITNC #{athlete.prospectRanking}</Text>
+                      <Text style={styles.ribbonText}>
+                        {(athlete.womensRanking
+                          ? rankLabel(athlete.womensRanking, "Female")
+                          : rankLabel(athlete.prospectRanking!, "Male")
+                        ).toUpperCase()}
+                      </Text>
                     </View>
                   ) : null}
                 </View>
@@ -985,9 +991,13 @@ export default function AthleteProfileScreen() {
                 {athlete.name || name}
               </Text>
               <Text style={styles.meta}>{profileMetaLine(athlete)}</Text>
-              {athlete.prospectRanking ? (
+              {athlete.prospectRanking || athlete.womensRanking ? (
                 <View style={styles.rank}>
-                  <Text style={styles.rankText}>RecruitNC #{athlete.prospectRanking}</Text>
+                  <Text style={styles.rankText}>
+                    {athlete.womensRanking
+                      ? rankLabel(athlete.womensRanking, "Female")
+                      : rankLabel(athlete.prospectRanking!, "Male")}
+                  </Text>
                 </View>
               ) : null}
             </View>

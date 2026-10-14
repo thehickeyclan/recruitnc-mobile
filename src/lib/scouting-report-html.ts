@@ -27,6 +27,7 @@ import {
   type ScoutingReport,
 } from "./scouting-report-format"
 import { keyFacts, snapshotFigures, starPart } from "./scouting-report-snapshot"
+import { rankLabel } from "./rank-label"
 
 export function escapeHtml(value: unknown): string {
   return String(value ?? "")
@@ -306,7 +307,7 @@ export function reportHtml(report: ScoutingReport): string {
     <div style="flex:1;min-width:0">
       <h1>${e(identity.name)}</h1>
       ${report.starRating ? `<div style="margin-top:6px">${stars(report.starRating.stars)} <span class="prospect">${report.starRating.stars}-STAR PROSPECT</span></div>` : ""}
-      <div class="rank">${e([report.rankingPublished && report.prospectRanking ? `RecruitNC #${report.prospectRanking}` : null, identity.graduationYear ? `Class of ${identity.graduationYear}` : null].filter(Boolean).join("  ·  "))}</div>
+      <div class="rank">${e([report.rankingPublished && report.prospectRanking ? rankLabel(report.prospectRanking, identity.gender) : null, identity.graduationYear ? `Class of ${identity.graduationYear}` : null].filter(Boolean).join("  ·  "))}</div>
       ${report.nationalRankings[0] ? `<div class="rank" style="margin-top:2px;font-size:11px">National #${report.nationalRankings[0].current} · ${e(report.nationalRankings[0].sourceLabel)}</div>` : ""}
       <div class="status">${e(statusLine(report))}</div>
       <div class="facts-id">${[identity.weightClass ? `<b style="color:#03154C">${e(identity.weightClass)} lbs</b>${identity.lastCompetedWeight && String(identity.lastCompetedWeight) !== String(identity.weightClass) ? ` · last competed ${e(identity.lastCompetedWeight)}` : ""}` : "", e(identity.highSchool ?? ""), e(identity.club ?? ""), membership.ncUnitedTeam ? `NC United ${e(membership.ncUnitedTeam.charAt(0).toUpperCase() + membership.ncUnitedTeam.slice(1))}` : ""].filter(Boolean).join("<br>")}</div>
