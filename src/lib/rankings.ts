@@ -45,6 +45,8 @@ export type RankingBoard = {
   gender?: RankingGender
   title: string
   cap: number
+  /** ISO time the board was published. Newer servers only. */
+  publishedAt?: string | null
   athletes: RankedAthlete[]
 }
 
@@ -115,4 +117,12 @@ export function alertRankingGender(data: unknown): RankingGender | null {
   const d = data as { kind?: unknown; gender?: unknown } | null | undefined
   if (d?.kind !== "rankings") return null
   return /female|women|girls/i.test(String(d.gender ?? "")) ? "Female" : null
+}
+
+/** "Published September 27, 2026", in Eastern time, or null when the server did not say. */
+export function publishedLabel(iso: string | null | undefined): string | null {
+  if (!iso) return null
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return null
+  return `Published ${d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "America/New_York" })}`
 }

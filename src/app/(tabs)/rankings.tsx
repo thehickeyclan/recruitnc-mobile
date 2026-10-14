@@ -21,6 +21,7 @@ import {
   alertRankingGender,
   boardGender,
   fetchRankings,
+  publishedLabel,
   type RankedAthlete,
   type RankingBoard,
   type RankingGender,
@@ -229,6 +230,10 @@ export default function RankingsScreen() {
         })}
       </View>
 
+      {publishedLabel(board?.publishedAt) ? (
+        <Text style={styles.published}>{publishedLabel(board?.publishedAt)}</Text>
+      ) : null}
+
       <FlatList
         data={board?.athletes ?? []}
         keyExtractor={(a) => a.athleteId}
@@ -398,6 +403,13 @@ const styles = StyleSheet.create({
   tabText: { ...type.label, lineHeight: 18, color: colors.textSecondary },
   tabTextActive: { color: colors.gold },
 
+  published: {
+    ...type.caption,
+    color: colors.gold,
+    paddingHorizontal: space.lg,
+    marginTop: -space.xs,
+    marginBottom: space.xs,
+  },
   list: { paddingHorizontal: space.lg, paddingBottom: space.xl },
   row: {
     flexDirection: "row",
