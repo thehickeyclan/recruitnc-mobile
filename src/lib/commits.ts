@@ -23,6 +23,8 @@ export type Commit = {
   commitmentdate: string | null
   collegeLogoUrl: string | null
   division: string | null
+  /** "Male" | "Female" as stored; null when the profile does not say. */
+  gender: string | null
 }
 
 /** "University of North Carolina at Pembroke" → "north carolina pembroke" */
@@ -84,7 +86,7 @@ export async function fetchCommits(limit = 300): Promise<{ commits: Commit[]; to
   const { data, error, count } = await supabase
     .from("athletes")
     .select(
-      "id, name, college, college_id, highschool, weightclass, graduationyear, photourl, commitmentdate",
+      "id, name, college, college_id, highschool, weightclass, graduationyear, photourl, commitmentdate, gender",
       { count: "exact" },
     )
     .not("college", "is", null)
@@ -115,6 +117,7 @@ export async function fetchCommits(limit = 300): Promise<{ commits: Commit[]; to
       commitmentdate: r.commitmentdate ?? null,
       collegeLogoUrl: logos[r.college] ?? null,
       division: r.college_id ? divisions[r.college_id] ?? null : null,
+      gender: r.gender ?? null,
     })),
   }
 }

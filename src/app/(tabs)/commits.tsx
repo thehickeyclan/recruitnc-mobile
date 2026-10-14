@@ -115,6 +115,12 @@ export default function CommitsScreen() {
   const [activeYear, setActiveYear] = useState("all")
   const [query, setQuery] = useState("")
   const [activeDivision, setActiveDivision] = useState("all")
+  /*
+   * Men's or women's commitments (Matt, 14 October 2026). "All" stays the default: this tab is a
+   * celebration feed as much as a list, and hiding a third of it behind a switch would be a loss.
+   * Year and level chips count within the chosen side, so "2026 · 4" means four women.
+   */
+  const [activeGender, setActiveGender] = useState<"all" | "Male" | "Female">("all")
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -134,22 +140,34 @@ export default function CommitsScreen() {
     void load().finally(() => setLoading(false))
   }, [load])
 
+  const byGender = useMemo(
+    () => (activeGender === "all" ? commits : commits.filter((c) => c.gender === activeGender)),
+    [commits, activeGender],
+  )
+  const genderCounts = useMemo(
+    () => ({
+      Male: commits.filter((c) => c.gender === "Male").length,
+      Female: commits.filter((c) => c.gender === "Female").length,
+    }),
+    [commits],
+  )
+
   const chips = useMemo<Chip[]>(() => {
     const counts = new Map<number, number>()
-    for (const c of commits) {
+    for (const c of byGender) {
       if (c.graduationyear) counts.set(c.graduationyear, (counts.get(c.graduationyear) ?? 0) + 1)
     }
     const years = [...counts.entries()].sort((a, b) => b[0] - a[0])
     return [
-      { key: "all", label: "All", count: commits.length },
+      { key: "all", label: "All", count: byGender.length },
       ...years.map(([year, count]) => ({ key: String(year), label: String(year), count })),
     ]
-  }, [commits])
+  }, [byGender])
 
   const divisionChips = useMemo<Chip[]>(() => {
     const ORDER = ["DI", "DII", "DIII", "NAIA", "NJCAA", "Club", "Other"]
     const counts = new Map<string, number>()
-    for (const c of commits) {
+    for (const c of byGender) {
       if (c.division) counts.set(c.division, (counts.get(c.division) ?? 0) + 1)
     }
     const present = [...counts.entries()].sort(
@@ -159,18 +177,18 @@ export default function CommitsScreen() {
       { key: "all", label: "All levels" },
       ...present.map(([division, count]) => ({ key: division, label: division, count })),
     ]
-  }, [commits])
+  }, [byGender])
 
   const visible = useMemo(() => {
     let list =
-      activeYear === "all" ? commits : commits.filter((c) => String(c.graduationyear) === activeYear)
+      activeYear === "all" ? byGender : byGender.filter((c) => String(c.graduationyear) === activeYear)
     if (activeDivision !== "all") list = list.filter((c) => c.division === activeDivision)
     const q = query.trim().toLowerCase()
     if (!q) return list
     return list.filter((c) =>
       [c.name, c.college, c.highschool].some((field) => field?.toLowerCase().includes(q)),
     )
-  }, [commits, activeYear, activeDivision, query])
+  }, [byGender, activeYear, activeDivision, query])
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
@@ -186,8 +204,10 @@ export default function CommitsScreen() {
         {!loading && !error ? (
           <Text style={styles.subtitle}>
             {activeYear === "all" && activeDivision === "all" && !query.trim()
-              ? `${total} North Carolina wrestlers committed`
-              : `${visible.length} of ${total} commitments`}
+              ? activeGender === "all"
+                ? `${total} North Carolina wrestlers committed`
+                : `${byGender.length} North Carolina ${activeGender === "Female" ? "women" : "men"} committed`
+              : `${visible.length} of ${byGender.length} commitments`}
           </Text>
         ) : null}
       </View>
@@ -220,6 +240,34 @@ export default function CommitsScreen() {
               <Ionicons name="close-circle" size={17} color={colors.textMuted} />
             </Pressable>
           ) : null}
+        </View>
+        <View style={styles.switch}>
+          {(
+            [
+              ["all", "All", commits.length],
+              ["Male", "Men's", genderCounts.Male],
+              ["Female", "Women's", genderCounts.Female],
+            ] as const
+          ).map(([key, label, count]) => {
+            const active = activeGender === key
+            return (
+              <Pressable
+                key={key}
+                onPress={() => {
+                  setActiveGender(key)
+                  setActiveYear("all")
+                  setActiveDivision("all")
+                }}
+                style={[styles.switchOption, active && styles.switchOptionActive]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+              >
+                <Text style={[styles.switchText, active && styles.switchTextActive]}>
+                  {label} · {count}
+                </Text>
+              </Pressable>
+            )
+          })}
         </View>
         <FilterChips chips={chips} activeKey={activeYear} onChange={setActiveYear} />
         <FilterChips chips={divisionChips} activeKey={activeDivision} onChange={setActiveDivision} />
@@ -265,6 +313,20 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
   },
   search: { flex: 1, color: colors.text, fontSize: 15, paddingVertical: 4 },
+  switch: {
+    flexDirection: "row",
+    marginHorizontal: space.lg,
+    marginBottom: space.md,
+    padding: 3,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface,
+  },
+  switchOption: { flex: 1, alignItems: "center", paddingVertical: 8, borderRadius: radius.pill },
+  switchOptionActive: { backgroundColor: colors.gold },
+  switchText: { ...type.label, lineHeight: 18, fontWeight: "700", color: colors.textSecondary },
+  switchTextActive: { color: colors.ink },
   empty: { ...type.body, color: colors.textMuted, textAlign: "center", paddingVertical: space.xl },
   cardPressed: { opacity: 0.65 },
   card: {
