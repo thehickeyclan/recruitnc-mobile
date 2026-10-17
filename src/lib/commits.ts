@@ -109,7 +109,9 @@ export async function fetchCommits(limit = 300): Promise<{ commits: Commit[]; to
       highschool: r.highschool ?? null,
       weightclass: r.weightclass ?? null,
       graduationyear: r.graduationyear ?? null,
-      photourl: r.photourl ?? null,
+      // The commitment photo (uploaded in admin under College) first, as the website's commit cards
+      // use it; the profile photo when there is none (Matt, 16 October 2026).
+      photourl: r.commitmentPhotoUrl || r.photourl || null,
       commitmentdate: r.commitmentdate ?? null,
       collegeLogoUrl: logos[r.college] ?? null,
       division: r.college_id ? divisions[r.college_id] ?? null : null,
