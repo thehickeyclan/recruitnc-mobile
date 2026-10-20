@@ -58,9 +58,29 @@ function TopStory({ item }: { item: NewsItem }) {
     if (item.path) openWebPage(item.path)
     else if (item.url) openWeb(item.url)
   }
+  /*
+   * The image at its own shape. Every story was cropped into a 4:3 box, which cut the words and the
+   * mascot off a 1200x630 banner (the Command Center launch, 19 Oct 2026). Read the real size and
+   * use it; until it arrives, a banner's 1.9:1, the shape most story art is made in.
+   */
+  const [ratio, setRatio] = useState(1200 / 630)
+  useEffect(() => {
+    if (!item.image) return
+    let live = true
+    Image.getSize(
+      item.image,
+      (w, h) => {
+        if (live && w > 0 && h > 0) setRatio(Math.min(Math.max(w / h, 0.8), 2.4))
+      },
+      () => undefined,
+    )
+    return () => {
+      live = false
+    }
+  }, [item.image])
   return (
     <Pressable style={styles.story} onPress={open} accessibilityRole="link" accessibilityLabel={item.title}>
-      {item.image ? <Image source={{ uri: item.image }} style={styles.storyImage} resizeMode="cover" /> : null}
+      {item.image ? <Image source={{ uri: item.image }} style={[styles.storyImage, { aspectRatio: ratio }]} resizeMode="contain" /> : null}
       <View style={styles.storyBody}>
         {item.category ? <Text style={styles.storyCategory}>{item.category}</Text> : null}
         <Text style={styles.storyTitle}>{item.title}</Text>
@@ -247,7 +267,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     overflow: "hidden",
   },
-  storyImage: { width: "100%", aspectRatio: 4 / 3, backgroundColor: "#000" },
+  storyImage: { width: "100%", backgroundColor: "#0A1628" },
   storyBody: { padding: space.md, gap: 6 },
   storyCategory: { ...type.label, color: colors.gold, letterSpacing: 1.5 },
   storyTitle: { ...type.heading, color: colors.text },
