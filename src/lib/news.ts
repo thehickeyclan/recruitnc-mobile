@@ -1,6 +1,8 @@
 const WEB = process.env.EXPO_PUBLIC_WEB_BASE_URL
 
 export type NewsItem = {
+  /** The top-story card's tap line, sent per story by the site (e.g. "Follow NC live at Super 32 HQ"). */
+  actionLabel?: string | null
   slug: string
   title: string
   summary: string

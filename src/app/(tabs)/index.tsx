@@ -65,7 +65,7 @@ function TopStory({ item }: { item: NewsItem }) {
         {item.category ? <Text style={styles.storyCategory}>{item.category}</Text> : null}
         <Text style={styles.storyTitle}>{item.title}</Text>
         <Text style={styles.storySummary} numberOfLines={3}>{item.summary}</Text>
-        <Text style={styles.storyAction}>Read the story ›</Text>
+        <Text style={styles.storyAction}>{item.actionLabel || "Read the story"} ›</Text>
       </View>
     </Pressable>
   )
