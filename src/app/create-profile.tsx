@@ -1,19 +1,9 @@
 import { useCallback, useMemo, useState } from "react"
-import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native"
-import { SafeAreaView } from "react-native-safe-area-context"
+import { ActivityIndicator, Pressable, Text, View } from "react-native"
 import { router, useFocusEffect } from "expo-router"
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { colors, radius, space, type } from "@/theme/tokens"
+import { colors } from "@/theme/tokens"
+import { Big, Chip, Field, Next, Question, Shell, rows, wizardStyles as styles } from "@/components/wizard"
 import { currentUserId, claimAthleteProfile, saveAthleteEdits } from "@/lib/athlete-edit"
 import { openWebPage } from "@/lib/profile-link"
 import { createProfile, graduationYears, WEIGHTS, type CreateResult, type NewProfile } from "@/lib/create-profile"
@@ -327,50 +317,6 @@ export default function CreateProfileScreen() {
   )
 }
 
-function Shell({
-  children,
-  onClose,
-  onBack,
-  progress,
-}: {
-  children: React.ReactNode
-  onClose: () => void
-  onBack?: () => void
-  progress?: number
-}) {
-  return (
-    <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
-      <View style={styles.bar}>
-        {onBack ? (
-          <Pressable onPress={onBack} hitSlop={12} style={styles.barButton}>
-            <Ionicons name="chevron-back" size={22} color={colors.gold} />
-          </Pressable>
-        ) : (
-          <View style={styles.barButton} />
-        )}
-        <View style={styles.track}>{progress != null ? <View style={[styles.fill, { width: `${Math.round(progress * 100)}%` }]} /> : null}</View>
-        <Pressable onPress={onClose} hitSlop={12} style={styles.barButton} accessibilityLabel="Close">
-          <Ionicons name="close" size={22} color={colors.textMuted} />
-        </Pressable>
-      </View>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          {children}
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
-  )
-}
-
-function Question({ title, hint }: { title: string; hint?: string }) {
-  return (
-    <View style={styles.question}>
-      <Text style={styles.title}>{title}</Text>
-      {hint ? <Text style={styles.hint}>{hint}</Text> : null}
-    </View>
-  )
-}
-
 /** Stored as the label, in the same free-text column the website's "Academic interest" box fills. */
 const STUDY = [
   "Business",
@@ -410,126 +356,3 @@ function checkAcademics(gpa: string, sat: string, act: string): string | null {
   return null
 }
 
-/** Equal-width rows; the last is padded with nulls so its buttons match the rest. */
-function rows<T>(items: readonly T[], size: number): (T | null)[][] {
-  const out: (T | null)[][] = []
-  for (let i = 0; i < items.length; i += size) {
-    const row: (T | null)[] = items.slice(i, i + size)
-    while (row.length < size) row.push(null)
-    out.push(row)
-  }
-  return out
-}
-
-function Field(props: {
-  value: string
-  onChange: (v: string) => void
-  placeholder: string
-  autoFocus?: boolean
-  keyboard?: "decimal-pad" | "number-pad" | "phone-pad"
-}) {
-  return (
-    <TextInput
-      style={styles.input}
-      value={props.value}
-      onChangeText={props.onChange}
-      placeholder={props.placeholder}
-      placeholderTextColor={colors.textMuted}
-      autoFocus={props.autoFocus}
-      keyboardType={props.keyboard ?? "default"}
-      textContentType={props.keyboard === "phone-pad" ? "telephoneNumber" : undefined}
-      autoCapitalize="words"
-      autoCorrect={false}
-      returnKeyType="next"
-    />
-  )
-}
-
-function Big({ label, icon, onPress }: { label: string; icon?: keyof typeof Ionicons.glyphMap; onPress: () => void }) {
-  return (
-    <Pressable style={({ pressed }) => [styles.big, pressed && styles.pressed]} onPress={onPress}>
-      {icon ? <Ionicons name={icon} size={20} color={colors.ink} /> : null}
-      <Text style={styles.bigText}>{label}</Text>
-    </Pressable>
-  )
-}
-
-function Next({ disabled, onPress }: { disabled: boolean; onPress: () => void }) {
-  return (
-    <Pressable style={[styles.big, disabled && styles.disabled]} disabled={disabled} onPress={onPress}>
-      <Text style={styles.bigText}>Next</Text>
-      <Ionicons name="arrow-forward" size={18} color={colors.ink} />
-    </Pressable>
-  )
-}
-
-function Chip(props: { label: string; on: boolean; onPress: () => void; wide?: boolean; fill?: boolean; small?: boolean }) {
-  const { label, on, onPress, wide, fill, small } = props
-  return (
-    <Pressable style={[styles.chip, wide && styles.chipWide, fill && styles.flex, on && styles.chipOn]} onPress={onPress}>
-      <Text style={[styles.chipText, small && styles.chipSmall, on && styles.chipTextOn]} numberOfLines={1} adjustsFontSizeToFit>
-        {label}
-      </Text>
-    </Pressable>
-  )
-}
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.ink },
-  flex: { flex: 1 },
-  bar: { flexDirection: "row", alignItems: "center", gap: space.md, paddingHorizontal: space.md, paddingVertical: space.sm },
-  barButton: { width: 28, alignItems: "center" },
-  track: { flex: 1, height: 6, borderRadius: radius.pill, backgroundColor: colors.surface, overflow: "hidden" },
-  fill: { height: 6, borderRadius: radius.pill, backgroundColor: colors.gold },
-  content: { padding: space.xl, gap: space.md, paddingBottom: space.xxl * 2 },
-  question: { gap: space.sm, marginBottom: space.sm, marginTop: space.lg },
-  title: { ...type.title, fontSize: 26, color: colors.text },
-  hint: { ...type.body, color: colors.textSecondary, fontWeight: "400", lineHeight: 21 },
-  input: {
-    ...type.body,
-    fontSize: 18,
-    color: colors.text,
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.line,
-    paddingHorizontal: space.lg,
-    paddingVertical: 16,
-  },
-  big: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: space.sm,
-    backgroundColor: colors.gold,
-    borderRadius: radius.md,
-    paddingVertical: 18,
-    marginTop: space.sm,
-  },
-  bigText: { ...type.heading, color: colors.ink, fontWeight: "800" },
-  pressed: { opacity: 0.85 },
-  disabled: { opacity: 0.35 },
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: space.sm },
-  row: { flexDirection: "row", gap: space.sm },
-  ghost: { opacity: 0 },
-  chip: {
-    minWidth: 72,
-    alignItems: "center",
-    paddingVertical: 16,
-    paddingHorizontal: space.md,
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.line,
-  },
-  chipWide: { width: "100%" },
-  chipOn: { backgroundColor: colors.gold, borderColor: colors.gold },
-  chipText: { ...type.heading, color: colors.text },
-  chipTextOn: { color: colors.ink },
-  chipSmall: { fontSize: 15, fontWeight: "700" },
-  skip: { ...type.label, color: colors.gold, textAlign: "center", marginTop: space.md },
-  error: { ...type.label, color: colors.red, fontWeight: "600" },
-  centre: { alignItems: "center", gap: space.md, marginTop: space.xl },
-  card: { backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, padding: space.lg, gap: 4 },
-  cardName: { ...type.title, color: colors.text },
-})

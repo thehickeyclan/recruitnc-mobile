@@ -200,7 +200,14 @@ export default function CommitsScreen() {
     <SafeAreaView style={styles.screen} edges={["top"]}>
       <View style={styles.header}>
         <Text style={styles.eyebrow}>RECRUITNC</Text>
-        <Text style={styles.title} maxFontSizeMultiplier={1.4}>Commitments</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title} maxFontSizeMultiplier={1.4}>Commitments</Text>
+          {/* Anyone with the news - the wrestler, a parent, a coach (26 Oct 2026). */}
+          <Pressable style={styles.report} onPress={() => router.push("/report-commitment")} accessibilityLabel="Report a commitment">
+            <Ionicons name="add" size={16} color={colors.ink} />
+            <Text style={styles.reportText}>Report</Text>
+          </Pressable>
+        </View>
         {!loading && !error ? (
           <Text style={styles.subtitle}>
             {activeYear === "all" && activeDivision === "all" && !query.trim()
@@ -293,6 +300,9 @@ export default function CommitsScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.ink },
   header: { paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: space.lg },
+  titleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: space.md },
+  report: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: colors.gold, borderRadius: radius.pill, paddingVertical: 8, paddingHorizontal: 14 },
+  reportText: { color: colors.ink, fontSize: 14, fontWeight: "800" },
   eyebrow: { ...type.caption, color: colors.gold, marginBottom: space.xs },
   title: { ...type.display, color: colors.text },
   subtitle: { ...type.body, color: colors.textSecondary, marginTop: space.xs },

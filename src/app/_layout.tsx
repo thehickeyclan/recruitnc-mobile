@@ -79,6 +79,7 @@ export default function RootLayout() {
         <Stack.Screen name="toc-results" options={{ presentation: "modal" }} />
         <Stack.Screen name="sign-in" options={{ presentation: "modal" }} />
         <Stack.Screen name="create-profile" options={{ presentation: "modal" }} />
+        <Stack.Screen name="report-commitment" options={{ presentation: "modal" }} />
       </Stack>
     </>
   )

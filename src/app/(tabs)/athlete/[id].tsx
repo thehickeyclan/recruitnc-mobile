@@ -859,6 +859,17 @@ export default function AthleteProfileScreen() {
                   </Pressable>
                 </View>
               ) : null}
+              {/* The family hears it first: report the commitment from here (26 Oct 2026). */}
+              {standing === "mine" && !athlete.commitment ? (
+                <Pressable
+                  onPress={() => router.push({ pathname: "/report-commitment", params: { athlete: String(id), name: athlete.name } })}
+                  style={styles.reportCommit}
+                >
+                  <Ionicons name="school" size={16} color={colors.gold} />
+                  <Text style={styles.reportCommitText}>Committed to a college? Tell us</Text>
+                  <Ionicons name="chevron-forward" size={16} color={colors.gold} />
+                </Pressable>
+              ) : null}
 
               {/* One list of rows, each opening in place (Matt's mock, 8 Oct 2026). Key finishes lead
                   Tournament Results' summary line; contact is a row, for coaches only. */}
@@ -1139,6 +1150,8 @@ export default function AthleteProfileScreen() {
 }
 
 const styles = StyleSheet.create({
+  reportCommit: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 12, paddingHorizontal: 4 },
+  reportCommitText: { flex: 1, color: colors.gold, fontSize: 15, fontWeight: "800" },
   screen: { flex: 1, backgroundColor: colors.ink },
   flex: { flex: 1 },
   content: { padding: space.lg, paddingBottom: space.xxl * 2, gap: space.md },

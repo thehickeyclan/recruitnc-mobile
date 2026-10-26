@@ -86,7 +86,7 @@ export async function fetchCommits(limit = 300): Promise<{ commits: Commit[]; to
   const { data, error, count } = await supabase
     .from("athletes")
     .select(
-      "id, name, college, college_id, highschool, weightclass, graduationyear, photourl, commitmentdate, gender",
+      'id, name, college, college_id, highschool, weightclass, graduationyear, photourl, "commitmentPhotoUrl", commitmentdate, gender',
       { count: "exact" },
     )
     .not("college", "is", null)
