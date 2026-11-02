@@ -34,7 +34,7 @@ const ALERTS: { key: keyof AlertPrefs; title: string; detail: string }[] = [
   {
     key: "programViews",
     title: "College interest",
-    detail: "NC United Blue: when a college program views your wrestler's profile. Sign in and link your wrestler to get these.",
+    detail: "When a college program views your wrestler's profile. Insider and Blue see which program. Sign in and link your wrestler to get these.",
   },
   {
     key: "results",
