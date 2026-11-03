@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context"
 import { router } from "expo-router"
 import * as WebBrowser from "expo-web-browser"
 import Ionicons from "@expo/vector-icons/Ionicons"
+import { Image } from "expo-image"
 import { colors, radius, space, type } from "@/theme/tokens"
 import { eventCoversDate, fetchAllEvents, formatTime, type CalendarEvent } from "@/lib/events"
 import { useCollegeFollows } from "@/lib/use-college-follows"
@@ -21,6 +22,19 @@ function DateBlock({ iso }: { iso: string }) {
   )
 }
 
+/**
+ * A college's logo on a small white tile. Several marks are black (App State, UNC Pembroke) and
+ * would vanish on the navy screen, so every one sits on white, the way coach emails show them.
+ */
+function TeamLogo({ uri, size }: { uri: string | null | undefined; size: number }) {
+  if (!uri) return null
+  return (
+    <View style={[styles.logoTile, { width: size, height: size, borderRadius: size / 4 }]}>
+      <Image source={{ uri }} style={{ width: size - 6, height: size - 6 }} contentFit="contain" transition={150} />
+    </View>
+  )
+}
+
 function EventCard({ event }: { event: CalendarEvent }) {
   const time = formatTime(event.startTime)
   const endTime = formatTime(event.endTime)
@@ -32,7 +46,10 @@ function EventCard({ event }: { event: CalendarEvent }) {
       <DateBlock iso={event.startDate} />
 
       <View style={styles.cardBody}>
-        <Text style={styles.category}>{event.categoryLabel.toUpperCase()}</Text>
+        <View style={styles.categoryRow}>
+          <TeamLogo uri={event.logoUrl} size={20} />
+          <Text style={styles.category}>{event.categoryLabel.toUpperCase()}</Text>
+        </View>
         <Text style={styles.title} numberOfLines={2}>
           {event.title}
         </Text>
@@ -213,6 +230,7 @@ export default function CalendarScreen() {
                       accessibilityState={{ selected: following }}
                       style={[styles.teamRow, following && styles.teamRowActive]}
                     >
+                      <TeamLogo uri={team.logoUrl} size={32} />
                       <View style={styles.teamNames}>
                         <Text style={[styles.teamName, following && styles.teamNameActive]}>{team.name}</Text>
                         {team.division ? <Text style={styles.teamDivision}>{team.division}</Text> : null}
@@ -347,7 +365,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
   },
   teamRowActive: { backgroundColor: colors.surface },
-  teamNames: { flex: 1 },
+  teamNames: { flex: 1, marginLeft: space.sm },
+  logoTile: { backgroundColor: "#ffffff", alignItems: "center", justifyContent: "center" },
+  categoryRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   teamName: { ...type.body, color: colors.textSecondary },
   teamNameActive: { color: colors.text },
   teamDivision: { ...type.caption, color: colors.textMuted },

@@ -89,7 +89,7 @@ export async function fetchCollegeMeets(collegeIds: string[], season = currentSe
  * Mapped rather than given its own list so a college dual sits in the month grid on its date,
  * beside the NC events, instead of in a second place a reader has to remember to check.
  */
-export function toCalendarEvent(meet: CollegeMeet, teamName: string): CalendarEvent {
+export function toCalendarEvent(meet: CollegeMeet, teamName: string, logoUrl: string | null = null): CalendarEvent {
   const who = meet.opponent ?? meet.eventName ?? "TBA"
   const fixture = meet.opponent ? `${meet.homeAway === "away" ? "at" : "vs"} ${who}` : who
   const called = meet.status === "cancelled" ? " (cancelled)" : meet.status === "postponed" ? " (postponed)" : ""
@@ -108,6 +108,7 @@ export function toCalendarEvent(meet: CollegeMeet, teamName: string): CalendarEv
     location: meet.location,
     externalLink: meet.streamUrl,
     acceptsDropIn: false,
+    logoUrl,
   }
 }
 

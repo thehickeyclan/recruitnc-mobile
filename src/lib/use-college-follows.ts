@@ -66,7 +66,7 @@ export function useCollegeFollows() {
     fetchCollegeMeets(followed)
       .then((meets) => {
         if (cancelled) return
-        setEvents(meets.map((meet) => toCalendarEvent(meet, teamById.get(meet.collegeId)?.name ?? "College")))
+        setEvents(meets.map((meet) => toCalendarEvent(meet, teamById.get(meet.collegeId)?.name ?? "College", teamById.get(meet.collegeId)?.logoUrl ?? null)))
       })
       .catch(() => !cancelled && setEvents([]))
     return () => {

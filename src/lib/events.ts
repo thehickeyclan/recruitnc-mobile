@@ -14,6 +14,8 @@ export type CalendarEvent = {
   location: string | null
   externalLink: string | null
   acceptsDropIn: boolean
+  /** A followed college team's logo, drawn beside its meets. */
+  logoUrl?: string | null
 }
 
 /** Mirrors eventCategories in the web app's lib/nc-united-calendar/calendar-config.ts. */
