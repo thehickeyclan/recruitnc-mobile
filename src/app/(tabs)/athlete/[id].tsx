@@ -11,7 +11,8 @@ import { CoachMessageAction } from "@/components/coach-message-action"
 import { fetchEligibility } from "@/lib/coach-messages"
 import { colors, radius, space, type } from "@/theme/tokens"
 import { openAthleteProfile, openWebPage } from "@/lib/profile-link"
-import { claimAthleteProfile, currentUserId, loadAthleteEdits } from "@/lib/athlete-edit"
+import { claimAthleteProfile, currentUserId, loadAthleteEdits, needsParentSignature, type ParentConsent } from "@/lib/athlete-edit"
+import { ParentConsentSheet } from "@/components/ParentConsentSheet"
 import { fetchFollowState, setFollowing } from "@/lib/follows"
 import { fetchScoutingAccess } from "@/lib/scouting-report"
 import { rankLabel } from "@/lib/rank-label"
@@ -508,6 +509,9 @@ export default function AthleteProfileScreen() {
    */
   const [standing, setStanding] = useState<"unknown" | "mine" | "other" | "signed-out">("unknown")
   const [claiming, setClaiming] = useState(false)
+  // The parent's signature sheet: opened by "I'm a parent", or when the server asks for one.
+  const [consentOpen, setConsentOpen] = useState(false)
+  const [consentError, setConsentError] = useState<string | null>(null)
 
   const checkStanding = useCallback(async () => {
     try {
@@ -655,19 +659,50 @@ export default function AthleteProfileScreen() {
     }
   }, [id, standing])
 
+  const claimed = async () => {
+    await checkStanding()
+    /*
+     * Into the same form the website uses. A claim used to end on an alert, so a family
+     * arrived at a page built from results and left it exactly as they found it - and the
+     * app had no way to fill in a GPA at all.
+     */
+    openWebPage(`/profile-setup?id=${encodeURIComponent(String(id))}`)
+  }
+
+  /*
+   * A parent signs before linking. "This is me" goes straight through, but the server decides
+   * parent-or-wrestler from the account's role, so it can still answer "parent_signature_required"
+   * - and then the same sheet opens and the claim is retried with the signature.
+   */
   const claim = (as: "self" | "parent") => {
+    if (as === "parent") {
+      setConsentError(null)
+      setConsentOpen(true)
+      return
+    }
     setClaiming(true)
     void claimAthleteProfile(String(id), as)
-      .then(async () => {
-        await checkStanding()
-        /*
-         * Into the same form the website uses. A claim used to end on an alert, so a family
-         * arrived at a page built from results and left it exactly as they found it - and the
-         * app had no way to fill in a GPA at all.
-         */
-        openWebPage(`/profile-setup?id=${encodeURIComponent(String(id))}`)
+      .then(claimed)
+      .catch((e: unknown) => {
+        if (needsParentSignature(e)) {
+          setConsentError(null)
+          setConsentOpen(true)
+          return
+        }
+        Alert.alert("Could not claim", e instanceof Error ? e.message : "Try again.")
       })
-      .catch((e: unknown) => Alert.alert("Could not claim", e instanceof Error ? e.message : "Try again."))
+      .finally(() => setClaiming(false))
+  }
+
+  const claimAsParent = (consent: ParentConsent) => {
+    setClaiming(true)
+    setConsentError(null)
+    void claimAthleteProfile(String(id), "parent", undefined, consent)
+      .then(async () => {
+        setConsentOpen(false)
+        await claimed()
+      })
+      .catch((e: unknown) => setConsentError(e instanceof Error ? e.message : "Could not link that profile. Try again."))
       .finally(() => setClaiming(false))
   }
 
@@ -1145,6 +1180,14 @@ export default function AthleteProfileScreen() {
           </Pressable>
         </ScrollView>
       )}
+      <ParentConsentSheet
+        visible={consentOpen}
+        athleteName={athlete?.name || String(name ?? "")}
+        busy={claiming}
+        error={consentError}
+        onCancel={() => setConsentOpen(false)}
+        onSign={claimAsParent}
+      />
     </SafeAreaView>
   )
 }

@@ -38,7 +38,9 @@ function useNotificationTaps() {
     if (!path) return
     // News lives on the website; the app has no screen of its own for an article, so a news
     // alert routed in-app landed on "unmatched route". Open the article in the web sheet instead.
-    if (path === "/news" || path.startsWith("/news/")) openWebPage(path)
+    // A family-link alert (another family member asked to join a wrestler) is a signed-in web
+    // page too: /family-link/<id>/<token>.
+    if (path === "/news" || path.startsWith("/news/") || path.startsWith("/family-link/")) openWebPage(path)
     else router.push(path as never)
   }, [navigationReady, response])
 }

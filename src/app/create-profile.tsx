@@ -4,7 +4,8 @@ import { router, useFocusEffect } from "expo-router"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { colors } from "@/theme/tokens"
 import { Big, Chip, Field, Next, Question, Shell, rows, wizardStyles as styles } from "@/components/wizard"
-import { currentUserId, claimAthleteProfile, saveAthleteEdits } from "@/lib/athlete-edit"
+import { currentUserId, claimAthleteProfile, needsParentSignature, saveAthleteEdits, type ParentConsent } from "@/lib/athlete-edit"
+import { ParentConsentSheet } from "@/components/ParentConsentSheet"
 import { openWebPage } from "@/lib/profile-link"
 import { createProfile, graduationYears, WEIGHTS, type CreateResult, type NewProfile } from "@/lib/create-profile"
 
@@ -47,6 +48,8 @@ export default function CreateProfileScreen() {
   const [error, setError] = useState<string | null>(null)
   const [found, setFound] = useState<Extract<CreateResult, { kind: "existing" }> | null>(null)
   const [result, setResult] = useState<{ athleteId: string; athleteName: string } | null>(null)
+  // Opened only if the server still asks for a parent's signature on an existing profile.
+  const [consentOpen, setConsentOpen] = useState(false)
 
   // Signing in happens on its own screen; when the wizard comes back into view, look again.
   useFocusEffect(
@@ -100,13 +103,21 @@ export default function CreateProfileScreen() {
     }
   }
 
-  const claimFound = async () => {
+  const claimFound = async (signed?: ParentConsent) => {
     if (!found) return
     setError(null)
     setStep("saving")
+    /*
+     * A parent already signed on the wizard's signature step, so that name goes with the claim -
+     * the server refuses a parent link without one. The phone step asks for the wrestler's cell,
+     * not the parent's, so it is not sent as the account's cell; it goes on the profile below.
+     */
+    const consent: ParentConsent | undefined =
+      signed ?? (signedName.trim().split(/\s+/).length >= 2 ? { signedName: signedName.trim() } : undefined)
     try {
       // Girls imported without a class year get one from this: the server fills blanks only.
-      await claimAthleteProfile(found.athleteId, rel, { graduationYear: year, highSchool: school.trim() || null })
+      await claimAthleteProfile(found.athleteId, rel, { graduationYear: year, highSchool: school.trim() || null }, consent)
+      setConsentOpen(false)
       // The profile already existed, so the phone and grades typed in the wizard go on as an edit.
       const grades = Object.fromEntries(
         ([["phone", phoneDigits(phone)], ["gpa", gpa], ["sat", sat], ["act", act], ["intendedMajor", study ?? ""]] as const).filter(([, v]) => v.trim()).map(([k, v]) => [k, v.trim()]),
@@ -115,8 +126,13 @@ export default function CreateProfileScreen() {
       setResult({ athleteId: found.athleteId, athleteName: found.athleteName })
       setStep("done")
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not claim that profile.")
       setStep("found")
+      // The server links a parent-role account as a parent even from "I'm the wrestler"; sign here.
+      if (needsParentSignature(e) && !signed) {
+        setConsentOpen(true)
+        return
+      }
+      setError(e instanceof Error ? e.message : "Could not claim that profile.")
     }
   }
 
@@ -284,6 +300,13 @@ export default function CreateProfileScreen() {
           <Pressable onPress={() => void submit(true)}>
             <Text style={styles.skip}>No — create a new profile</Text>
           </Pressable>
+          <ParentConsentSheet
+            visible={consentOpen}
+            athleteName={found.athleteName}
+            error={error}
+            onCancel={() => setConsentOpen(false)}
+            onSign={(c) => void claimFound(c)}
+          />
         </>
       ) : null}
 

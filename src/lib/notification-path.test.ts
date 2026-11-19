@@ -6,6 +6,11 @@ describe("notificationPath", () => {
     expect(notificationPath({ kind: "toc-brackets", path: "/toc-bracket" })).toBe("/toc-bracket")
   })
 
+  it("follows a family-link alert's path (opened as a signed-in web page)", () => {
+    const path = "/family-link/3f2b9c1e-8d4a-4b6f-9e2a-1c5d7f0a9b3e/9f86d081884c7d659a2feaa0c55ad015"
+    expect(notificationPath({ kind: "family-link", path })).toBe(path)
+  })
+
   it("ignores an alert with no path", () => {
     expect(notificationPath({ kind: "commit" })).toBeNull()
     expect(notificationPath(undefined)).toBeNull()

@@ -38,11 +38,6 @@ export async function currentUserId(): Promise<string | null> {
   return data.session?.user?.id ?? null
 }
 
-async function readError(response: Response, fallback: string): Promise<string> {
-  const body = (await response.json().catch(() => null)) as { error?: string } | null
-  return body?.error ?? fallback
-}
-
 /**
  * What is already on the profile, for whoever may change it.
  *
@@ -72,20 +67,79 @@ export async function loadAthleteEdits(
   return { fields: { ...body.fields, phone: body.fields.phone ?? "" }, relationship: body.relationship ?? "self" }
 }
 
-/** `fill` comes from the create-profile wizard: the server writes it only where the profile is blank. */
+/** The wording version the parent agreed to; the server records it with the signature. */
+export const PARENT_CONSENT_VERSION = "2026-10-01"
+
+/** A parent's typed signature (first and last name) and, optionally, a cell for the account. */
+export type ParentConsent = { signedName: string; cellPhone?: string | null }
+
+/**
+ * A claim the server refused, with its machine-readable reason.
+ *
+ * `parent_signature_required` is the one callers act on: the server decides parent-or-wrestler
+ * from the account's role, so even "This is me" can come back asking for a parent's signature.
+ */
+export class ClaimError extends Error {
+  readonly code: string | null
+  constructor(message: string, code: string | null) {
+    super(message)
+    this.name = "ClaimError"
+    this.code = code
+  }
+}
+
+export function needsParentSignature(e: unknown): boolean {
+  return e instanceof ClaimError && e.code === "parent_signature_required"
+}
+
+/**
+ * Whether the signed-in account already has a cell on file, so the consent sheet need not ask.
+ *
+ * Best effort: any failure (no session, a column the anon role cannot read) answers false and the
+ * sheet shows the field. The server never overwrites a cell that is already there.
+ */
+export async function accountHasCell(): Promise<boolean> {
+  try {
+    const userId = await currentUserId()
+    if (!userId) return false
+    const { data, error } = await supabase.from("user_profiles").select("cell_phone").eq("user_id", userId).maybeSingle()
+    if (error || !data) return false
+    const cell = (data as { cell_phone?: string | null }).cell_phone
+    return typeof cell === "string" && cell.replace(/\D/g, "").length >= 10
+  } catch {
+    return false
+  }
+}
+
+/**
+ * `fill` comes from the create-profile wizard: the server writes it only where the profile is blank.
+ * `consent` is required by the server for every parent link; without it a parent claim throws a
+ * ClaimError with code `parent_signature_required`.
+ */
 export async function claimAthleteProfile(
   athleteId: string,
   as: "self" | "parent",
   fill?: { graduationYear?: number | null; highSchool?: string | null },
+  consent?: ParentConsent,
 ): Promise<void> {
   if (!BASE) throw new Error("This build has no EXPO_PUBLIC_WEB_BASE_URL.")
+  const signature = consent?.signedName.trim()
+    ? {
+        signedName: consent.signedName.trim(),
+        consentVersion: PARENT_CONSENT_VERSION,
+        ...(consent.cellPhone ? { cellPhone: consent.cellPhone } : {}),
+      }
+    : {}
   const response = await fetch(`${BASE}/api/mobile/v1/athlete/${encodeURIComponent(athleteId)}/claim`, {
     method: "POST",
     headers: await authHeaders(),
-    body: JSON.stringify({ as, ...(fill ?? {}) }),
+    body: JSON.stringify({ as, ...(fill ?? {}), ...signature }),
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })
-  if (!response.ok) throw new Error(await readError(response, "Could not claim that profile."))
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { error?: string; code?: string } | null
+    throw new ClaimError(body?.error ?? "Could not claim that profile.", body?.code ?? null)
+  }
 }
 
 /**
